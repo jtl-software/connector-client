@@ -24,7 +24,7 @@ class Client
      *
      * @var string
      */
-    protected $url;
+    protected $endpointUrl;
 
     /**
      * @var \GuzzleHttp\Client
@@ -47,12 +47,12 @@ class Client
 
     /**
      * Client constructor.
-     * @param string $url
+     * @param string $endpointUrl
      * @param \GuzzleHttp\Client $client
      */
-    public function __construct($url, \GuzzleHttp\Client $client = null)
+    public function __construct($endpointUrl, \GuzzleHttp\Client $client = null)
     {
-        $this->url = $url;
+        $this->endpointUrl = $endpointUrl;
         if($client === null) {
             $client = new \GuzzleHttp\Client();
         }
@@ -113,6 +113,18 @@ class Client
     /**
      * @param string $sessionId
      * @param string $controllerName
+     * @param mixed[] $data
+     * @return mixed[]
+     */
+    public function push($sessionId, $controllerName, array $data)
+    {
+        $method = $controllerName . '.push';
+        return $this->request($method, $sessionId, $data);
+    }
+
+    /**
+     * @param string $sessionId
+     * @param string $controllerName
      * @return mixed[]
      */
     public function statistic($sessionId, $controllerName)
@@ -142,7 +154,7 @@ class Client
      */
     protected function request($method, $sessionId = null, array $params = null)
     {
-        $url = $this->url;
+        $url = $this->endpointUrl;
         if($sessionId !== null && strlen($sessionId) > 0) {
             $url .= '?jtlauth=' . $sessionId;
         }
