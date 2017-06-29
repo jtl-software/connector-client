@@ -1,0 +1,19 @@
+{
+  "name": "jtl/connector-client",
+  "description": "A php client for jtl connectors.",
+  "type": "project",
+  "authors": [
+    {
+      "name": "Immanuel Klinkenberg",
+      "email": "immanuel.klinkenberg@jtl-software.com"
+    }
+  ],
+  "require": {
+    "guzzlehttp/guzzle": "^6.3"
+  },
+  "autoload": {
+    "psr-4": {
+      "jtl\\Connector\\": "src/"
+    }
+  }
+}
