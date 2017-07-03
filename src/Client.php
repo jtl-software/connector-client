@@ -61,13 +61,37 @@ class Client
     }
 
     /**
-     * @param $token
-     * @return mixed[]
+     * @param string $token
+     * @return string|null
      */
     public function authenticate($token)
     {
+        $tResponseFormat = $this->responseFormat;
+        $this->responseFormat = self::RESPONSE_FORMAT_ARRAY;
+
         $params = ['token' => $token];
-        return $this->request(self::METHOD_AUTH, null, $params);
+        $data = $this->request(self::METHOD_AUTH, null, $params);
+        $this->responseFormat = $tResponseFormat;
+        if(is_array($data['result'])
+            && count($data['result']) > 0
+            && isset($data['result']['sessionId'])
+            && !empty($data['result']['sessionId'])) {
+            return $data['result']['sessionId'];
+        }
+        return null;
+    }
+
+    /**
+     * @param string $sessionId
+     * @return boolean
+     */
+    public function isAuthenticated($sessionId)
+    {
+        $tResponseFormat = $this->responseFormat;
+        $this->responseFormat = self::RESPONSE_FORMAT_ARRAY;
+        $data = $this->features($sessionId);
+        $this->responseFormat = $tResponseFormat;
+        return !(isset($data['error']) && (isset($data['error']['code']) && $data['error']['code'] === -32000 || isset($data['error']['message']) && $data['error']['message'] === 'No session'));
     }
 
     /**
