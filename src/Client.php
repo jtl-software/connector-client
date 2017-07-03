@@ -187,15 +187,15 @@ class Client
         $response = $result->getBody()->getContents();
 
         switch ($this->responseFormat) {
-            case self::RESPONSE_FORMAT_ARRAY:
-                return \json_decode($response, true);
+            case self::RESPONSE_FORMAT_JSON:
+                return $response;
                 break;
             case self::RESPONSE_FORMAT_OBJECT:
                 return \json_decode($response);
                 break;
         }
 
-        return $response;
+        return \json_decode($response, true);;
     }
 
     /**
