@@ -10,6 +10,7 @@ class Client
     const JTLRPC_VERSION = 2.0;
     const DEFAULT_PULL_LIMIT = 100;
 
+    const METHOD_ACK = 'core.connector.ack';
     const METHOD_AUTH = 'core.connector.auth';
     const METHOD_FEATURES = 'core.connector.features';
     const METHOD_IDENTIFY = 'connector.identify';
@@ -32,12 +33,29 @@ class Client
     protected $client;
 
     /**
+     * @var string
+     */
+    protected $token;
+
+    /**
+     * @var string
+     */
+    protected $sessionId;
+
+    /**
+     * @var boolean
+     */
+    protected $authenticate = true;
+
+    /**
      * Client constructor.
+     * @param string $token
      * @param string $endpointUrl
      * @param \GuzzleHttp\Client $client
      */
-    public function __construct($endpointUrl, \GuzzleHttp\Client $client = null)
+    public function __construct($token, $endpointUrl, \GuzzleHttp\Client $client = null)
     {
+        $this->token = $token;
         $this->endpointUrl = $endpointUrl;
         if($client === null) {
             $client = new \GuzzleHttp\Client();
@@ -47,100 +65,118 @@ class Client
     }
 
     /**
-     * @param string $token
-     * @return string|null
+     * @return void
+     * @throws \Exception
      */
-    public function authenticate($token)
+    public function authenticate()
     {
-        $params = ['token' => $token];
-        $result = $this->request(self::METHOD_AUTH, null, $params);
+        $params = ['token' => $this->token];
+        $this->authenticate = false;
+        try {
+            $result = $this->request(self::METHOD_AUTH, $params);
+        } catch (\Exception $ex) {
+            $this->authenticate = true;
+            throw $ex;
+        }
+        $this->authenticate = true;
 
         if(is_array($result)
             && isset($result['sessionId'])
             && !empty($result['sessionId'])) {
-            return $result;
+            $this->sessionId = $result['sessionId'];
         }
-
-        return null;
+        else {
+            $this->sessionId = null;
+        }
     }
 
     /**
-     * @param string $sessionId
      * @return boolean
      */
-    public function isAuthenticated($sessionId)
+    public function isAuthenticated()
     {
-        try {
-            $this->features($sessionId);
-        } catch (Exception $ex) {
+        if($this->sessionId === null) {
             return false;
         }
+
+        try {
+            $this->authenticate = false;
+            $this->features();
+        } catch (Exception $ex) {
+            $this->authenticate = true;
+            return false;
+        }
+        $this->authenticate = true;
         return true;
     }
 
     /**
-     * @param string $sessionId
      * @return mixed[]
      */
-    public function features($sessionId)
+    public function features()
     {
-        return $this->request(self::METHOD_FEATURES, $sessionId);
+        return $this->request(self::METHOD_FEATURES);
     }
 
     /**
-     * @param string $sessionId
      * @return mixed[]
      */
-    public function clear($sessionId)
+    public function clear()
     {
-        return $this->request(self::METHOD_CLEAR, $sessionId);
+        return $this->request(self::METHOD_CLEAR);
     }
 
     /**
-     * @param string $sessionId
      * @return mixed[]
      */
-    public function identify($sessionId)
+    public function identify()
     {
-        return $this->request(self::METHOD_IDENTIFY, $sessionId);
+        return $this->request(self::METHOD_IDENTIFY);
     }
 
     /**
-     * @param string $sessionId
      * @param string $controllerName
      * @param integer $limit
      * @return mixed[]
      */
-    public function pull($sessionId, $controllerName, $limit = self::DEFAULT_PULL_LIMIT)
+    public function pull($controllerName, $limit = self::DEFAULT_PULL_LIMIT)
     {
         $method = $controllerName . '.pull';
         $params['limit'] = $limit;
-        return $this->request($method, $sessionId, $params);
+        return $this->request($method, $params);
     }
 
     /**
-     * @param string $sessionId
      * @param string $controllerName
-     * @param mixed[] $data
+     * @param mixed[] $entities
      * @return mixed[]
      */
-    public function push($sessionId, $controllerName, array $data)
+    public function push($controllerName, array $entities)
     {
         $method = $controllerName . '.push';
-        return $this->request($method, $sessionId, $data);
+        return $this->request($method, $entities);
+    }
+
+
+    /**
+     * @param mixed[] $identities
+     * @return mixed[]
+     */
+    public function ack(array $identities)
+    {
+        return $this->request(self::METHOD_ACK, $identities);
     }
 
     /**
-     * @param string $sessionId
      * @param string $controllerName
      * @return integer
      * @throws Exception
      */
-    public function statistic($sessionId, $controllerName)
+    public function statistic($controllerName)
     {
         $method = $controllerName . '.statistic';
         $params['limit'] = 0;
-        $response = $this->request($method, $sessionId, $params);
+        $response = $this->request($method, $params);
 
         if(!isset($response['available'])) {
             throw Exception::indexMissing('available', $controllerName, 'statistic');
@@ -150,21 +186,36 @@ class Client
     }
 
     /**
+     * @param string $token
+     * @return Client
+     */
+    public function setToken($token)
+    {
+        $this->token = $token;
+        return $this;
+    }
+
+    /**
      * @param string $method
-     * @param string|null $sessionId
      * @param mixed[]|null $params
      * @return mixed[]
      * @throws Exception
      */
-    protected function request($method, $sessionId = null, array $params = null)
+    protected function request($method, array $params = null)
     {
-        $url = $this->endpointUrl;
-        if($sessionId !== null && strlen($sessionId) > 0) {
-            $url .= '?jtlauth=' . $sessionId;
+        if($this->authenticate && ($this->sessionId === null || !$this->isAuthenticated())) {
+            $this->authenticate();
         }
+
+        $url = $this->endpointUrl;
+        if($this->sessionId !== null && strlen($this->sessionId) > 0) {
+            $url .= '?jtlauth=' . $this->sessionId;
+        }
+
         $requestId = uniqid();
         $result = $this->client->post($url, ['body' => $this->createRequestBody($requestId, $method, $params)]);
-        $response = \json_decode($result->getBody()->getContents(), true);
+        $content = $result->getBody()->getContents();
+        $response = \json_decode($content, true);
 
         if(is_array($response['error']) && !empty($response['error'])) {
             $error = $response['error'];
@@ -199,6 +250,7 @@ class Client
         $data['jtlrpc'] = self::JTLRPC_VERSION;
         $data['id'] = $requestId;
 
-        return 'jtlrpc=' . \json_encode($data);
+        $requestBody = 'jtlrpc=' . \json_encode($data);
+        return $requestBody;
     }
 }
