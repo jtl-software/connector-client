@@ -146,7 +146,7 @@ class Client
             throw Exception::indexMissing('available', $controllerName, 'statistic');
         }
 
-        return (integer)$response['available'];
+        return (int)$response['available'];
     }
 
     /**
