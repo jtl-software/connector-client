@@ -32,20 +32,6 @@ class Client
     protected $client;
 
     /**
-     * @var string
-     */
-    protected $responseFormat = self::RESPONSE_FORMAT_JSON;
-
-    /**
-     * @var string[]
-     */
-    protected $validResponseFormats = [
-        self::RESPONSE_FORMAT_ARRAY,
-        self::RESPONSE_FORMAT_OBJECT,
-        self::RESPONSE_FORMAT_JSON,
-    ];
-
-    /**
      * Client constructor.
      * @param string $endpointUrl
      * @param \GuzzleHttp\Client $client
@@ -66,18 +52,15 @@ class Client
      */
     public function authenticate($token)
     {
-        $tResponseFormat = $this->responseFormat;
-        $this->responseFormat = self::RESPONSE_FORMAT_ARRAY;
-
         $params = ['token' => $token];
-        $data = $this->request(self::METHOD_AUTH, null, $params);
-        $this->responseFormat = $tResponseFormat;
-        if(is_array($data['result'])
-            && count($data['result']) > 0
-            && isset($data['result']['sessionId'])
-            && !empty($data['result']['sessionId'])) {
-            return $data['result']['sessionId'];
+        $result = $this->request(self::METHOD_AUTH, null, $params);
+
+        if(is_array($result)
+            && isset($result['sessionId'])
+            && !empty($result['sessionId'])) {
+            return $result;
         }
+
         return null;
     }
 
@@ -87,11 +70,12 @@ class Client
      */
     public function isAuthenticated($sessionId)
     {
-        $tResponseFormat = $this->responseFormat;
-        $this->responseFormat = self::RESPONSE_FORMAT_ARRAY;
-        $data = $this->features($sessionId);
-        $this->responseFormat = $tResponseFormat;
-        return !(isset($data['error']) && (isset($data['error']['code']) && $data['error']['code'] === -32000 || isset($data['error']['message']) && $data['error']['message'] === 'No session'));
+        try {
+            $this->features($sessionId);
+        } catch (Exception $ex) {
+            return false;
+        }
+        return true;
     }
 
     /**
@@ -149,32 +133,28 @@ class Client
     /**
      * @param string $sessionId
      * @param string $controllerName
-     * @return mixed[]
+     * @return integer
+     * @throws Exception
      */
     public function statistic($sessionId, $controllerName)
     {
         $method = $controllerName . '.statistic';
         $params['limit'] = 0;
-        return $this->request($method, $sessionId, $params);
-    }
+        $response = $this->request($method, $sessionId, $params);
 
-    /**
-     * @param string $responseFormat
-     * @throws \Exception
-     */
-    public function setResponseFormat($responseFormat)
-    {
-        if(!in_array($responseFormat, $this->validResponseFormats)) {
-            throw new \Exception($responseFormat . ' is not a valid response Format!');
+        if(!isset($response['available'])) {
+            throw Exception::indexMissing('available', $controllerName, 'statistic');
         }
-        $this->responseFormat = $responseFormat;
+
+        return (integer)$response['available'];
     }
 
     /**
      * @param string $method
-     * @param null|string $sessionId
-     * @param mixed[] $params
+     * @param string|null $sessionId
+     * @param mixed[]|null $params
      * @return mixed[]
+     * @throws Exception
      */
     protected function request($method, $sessionId = null, array $params = null)
     {
@@ -184,18 +164,20 @@ class Client
         }
         $requestId = uniqid();
         $result = $this->client->post($url, ['body' => $this->createRequestBody($requestId, $method, $params)]);
-        $response = $result->getBody()->getContents();
+        $response = \json_decode($result->getBody()->getContents(), true);
 
-        switch ($this->responseFormat) {
-            case self::RESPONSE_FORMAT_JSON:
-                return $response;
-                break;
-            case self::RESPONSE_FORMAT_OBJECT:
-                return \json_decode($response);
-                break;
+        if(is_array($response['error']) && !empty($response['error'])) {
+            $error = $response['error'];
+            $message = isset($error['message']) ? $error['message'] : 'Unknown Error while fetching connector response';
+            $code = isset($error['code']) ? $error['code'] : Exception::UNKNOWN_ERROR;
+            throw Exception::responseError($message, $code);
         }
 
-        return \json_decode($response, true);;
+        if (is_array($response['result'])) {
+            return $response['result'];
+        }
+
+        return null;
     }
 
     /**
