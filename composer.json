@@ -8,12 +8,20 @@
       "email": "immanuel.klinkenberg@jtl-software.com"
     }
   ],
+  "repositories": [
+    {
+      "type": "git",
+      "url": "git@gitlab.jtl-software.de:jtl-software-gmbh/jtlconnector.git",
+      "reference": "origin/master"
+    }
+  ],
   "require": {
+    "jtl/connector": "^2.4",
     "guzzlehttp/guzzle": "^6.3"
   },
   "autoload": {
     "psr-4": {
-      "jtl\\Connector\\": "src/"
+      "jtl\\Connector\\Client\\": "src/"
     }
   }
 }

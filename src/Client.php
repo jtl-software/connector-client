@@ -3,11 +3,17 @@
  * @author Immanuel Klinkenberg <immanuel.klinkenberg@jtl-software.com>
  * @copyright 2010-2017 JTL-Software GmbH
  */
-namespace jtl\Connector;
+namespace jtl\Connector\Client;
+
+use JMS\Serializer\SerializationContext;
+use JMS\Serializer\Serializer;
+use jtl\Connector\Model\Ack;
+use jtl\Connector\Model\DataModel;
+use jtl\Connector\Serializer\JMS\SerializerBuilder;
 
 class Client
 {
-    const JTLRPC_VERSION = 2.0;
+    const JTL_RPC_VERSION = "2.0";
     const DEFAULT_PULL_LIMIT = 100;
 
     const METHOD_ACK = 'core.connector.ack';
@@ -16,9 +22,9 @@ class Client
     const METHOD_IDENTIFY = 'connector.identify';
     const METHOD_CLEAR = 'core.linker.clear';
 
-    const RESPONSE_FORMAT_JSON = 'json';
-    const RESPONSE_FORMAT_ARRAY = 'array';
-    const RESPONSE_FORMAT_OBJECT = 'object';
+    const DATA_FORMAT_JSON = 'json';
+    const DATA_FORMAT_ARRAY = 'array';
+    const DATA_FORMAT_OBJECT = 'object';
 
     /**
      * The Connector endpoint url
@@ -45,7 +51,12 @@ class Client
     /**
      * @var boolean
      */
-    protected $authenticate = true;
+    protected $authenticationRequest = false;
+
+    /**
+     * @var Serializer
+     */
+    protected $serializer;
 
     /**
      * Client constructor.
@@ -62,6 +73,7 @@ class Client
         }
 
         $this->client = $client;
+        $this->serializer = SerializerBuilder::create();
     }
 
     /**
@@ -71,14 +83,14 @@ class Client
     public function authenticate()
     {
         $params = ['token' => $this->token];
-        $this->authenticate = false;
+        $this->authenticationRequest = true;
         try {
             $result = $this->request(self::METHOD_AUTH, $params);
         } catch (\Exception $ex) {
-            $this->authenticate = true;
+            $this->authenticationRequest = false;
             throw $ex;
         }
-        $this->authenticate = true;
+        $this->authenticationRequest = false;
 
         if(is_array($result)
             && isset($result['sessionId'])
@@ -100,13 +112,13 @@ class Client
         }
 
         try {
-            $this->authenticate = false;
+            $this->authenticationRequest = true;
             $this->features();
-        } catch (Exception $ex) {
-            $this->authenticate = true;
+        } catch (ResponseException $ex) {
+            $this->authenticationRequest = false;
             return false;
         }
-        $this->authenticate = true;
+        $this->authenticationRequest = false;
         return true;
     }
 
@@ -119,7 +131,7 @@ class Client
     }
 
     /**
-     * @return mixed[]
+     * @return boolean
      */
     public function clear()
     {
@@ -137,13 +149,32 @@ class Client
     /**
      * @param string $controllerName
      * @param integer $limit
-     * @return mixed[]
+     * @param string $responseFormat
+     * @return DataModel[]
+     * @throws \Exception
      */
-    public function pull($controllerName, $limit = self::DEFAULT_PULL_LIMIT)
+    public function pull($controllerName, $limit = self::DEFAULT_PULL_LIMIT, $responseFormat = self::DATA_FORMAT_OBJECT)
     {
         $method = $controllerName . '.pull';
         $params['limit'] = $limit;
-        return $this->request($method, $params);
+        $entitiesData = $this->request($method, $params);
+
+        $className = 'jtl\\Connector\\Model\\' . $this->underscoreToCamelCase($controllerName);
+        if(!is_subclass_of($className, \jtl\Connector\Model\DataModel::class)){
+            throw new \Exception($className . ' does not inherit from ' . \jtl\Connector\Model\DataModel::class . '!');
+        }
+
+        switch($responseFormat){
+            case self::DATA_FORMAT_OBJECT:
+                $ns = 'ArrayCollection<' . $className . '>';
+                return $this->serializer->deserialize(\json_encode($entitiesData), $ns, 'json');
+                break;
+            case self::DATA_FORMAT_JSON:
+                return \json_encode($entitiesData);
+                break;
+        }
+
+        return $entitiesData;
     }
 
     /**
@@ -154,23 +185,24 @@ class Client
     public function push($controllerName, array $entities)
     {
         $method = $controllerName . '.push';
-        return $this->request($method, $entities);
+        $serialized = $this->serializer->serialize($entities, 'json');
+        return $this->request($method, \json_decode($serialized, true));
     }
 
-
     /**
-     * @param mixed[] $identities
+     * @param Ack $ack
      * @return mixed[]
      */
-    public function ack(array $identities)
+    public function ack(Ack $ack)
     {
-        return $this->request(self::METHOD_ACK, $identities);
+        $serialized = $this->serializer->serialize($ack, 'json');
+        return $this->request(self::METHOD_ACK, \json_decode($serialized, true));
     }
 
     /**
      * @param string $controllerName
      * @return integer
-     * @throws Exception
+     * @throws ResponseException
      */
     public function statistic($controllerName)
     {
@@ -179,7 +211,7 @@ class Client
         $response = $this->request($method, $params);
 
         if(!isset($response['available'])) {
-            throw Exception::indexMissing('available', $controllerName, 'statistic');
+            throw ResponseException::indexNotFound('available', $controllerName, 'statistic');
         }
 
         return (int)$response['available'];
@@ -197,13 +229,13 @@ class Client
 
     /**
      * @param string $method
-     * @param mixed[]|null $params
+     * @param mixed[] $params
      * @return mixed[]
-     * @throws Exception
+     * @throws ResponseException
      */
-    protected function request($method, array $params = null)
+    protected function request($method, array $params = [])
     {
-        if($this->authenticate && ($this->sessionId === null || !$this->isAuthenticated())) {
+        if(!$this->authenticationRequest && $this->sessionId === null) {
             $this->authenticate();
         }
 
@@ -217,18 +249,22 @@ class Client
         $content = $result->getBody()->getContents();
         $response = \json_decode($content, true);
 
-        if(is_array($response['error']) && !empty($response['error'])) {
+        if (isset($response['error']) && is_array($response['error']) && !empty($response['error'])) {
+            if (!$this->authenticationRequest && !$this->isAuthenticated()) {
+                $this->authenticate();
+                return $this->request($method, $params);
+            }
             $error = $response['error'];
             $message = isset($error['message']) ? $error['message'] : 'Unknown Error while fetching connector response';
-            $code = isset($error['code']) ? $error['code'] : Exception::UNKNOWN_ERROR;
-            throw Exception::responseError($message, $code);
+            $code = isset($error['code']) ? $error['code'] : ResponseException::UNKNOWN_ERROR;
+            throw ResponseException::responseError($message, $code);
         }
 
-        if (is_array($response['result'])) {
+        if (isset($response['result'])) {
             return $response['result'];
         }
 
-        return null;
+        throw ResponseException::unknownError();
     }
 
     /**
@@ -237,7 +273,7 @@ class Client
      * @param mixed[] $params
      * @return string
      */
-    protected function createRequestBody($requestId, $method, array $params = null)
+    protected function createRequestBody($requestId, $method, array $params = [])
     {
         $data = [
           'method' => $method,
@@ -247,10 +283,23 @@ class Client
             $data['params'] = $params;
         }
 
-        $data['jtlrpc'] = self::JTLRPC_VERSION;
+        $data['jtlrpc'] = self::JTL_RPC_VERSION;
         $data['id'] = $requestId;
 
         $requestBody = 'jtlrpc=' . \json_encode($data);
         return $requestBody;
+    }
+
+    /**
+     * @param string $string
+     * @return string
+     */
+    protected function underscoreToCamelCase($string)
+    {
+        $camelCase = '';
+        foreach(explode('_', $string) as $part) {
+            $camelCase .= ucfirst($part);
+        }
+        return $camelCase;
     }
 }
