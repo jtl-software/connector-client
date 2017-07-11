@@ -251,7 +251,7 @@ class Client
         if (isset($response['error']) && is_array($response['error']) && !empty($response['error'])) {
             $error = $response['error'];
             $message = isset($error['message']) ? $error['message'] : 'Unknown Error while fetching connector response';
-            $code = isset($error['code']) ? $error['code'] : ResponseException::UNKNOWN_ERROR;
+            $code = isset($error['code']) ? (int)$error['code'] : ResponseException::UNKNOWN_ERROR;
             if (!$this->authenticationRequest && $code === ResponseException::SESSION_INVALID) {
                 $this->authenticate();
                 return $this->request($method, $params);
