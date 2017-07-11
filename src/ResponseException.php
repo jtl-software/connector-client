@@ -9,6 +9,8 @@ class ResponseException extends Exception
 {
     const UNKNOWN_ERROR = 10;
     const INDEX_NOT_FOUND = 20;
+    const AUTHENTICATION_FAILED = 790;
+    const SESSION_INVALID = -32000;
 
     /**
      * @param string $message

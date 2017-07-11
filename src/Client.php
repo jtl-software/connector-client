@@ -5,7 +5,6 @@
  */
 namespace jtl\Connector\Client;
 
-use JMS\Serializer\SerializationContext;
 use JMS\Serializer\Serializer;
 use jtl\Connector\Model\Ack;
 use jtl\Connector\Model\DataModel;
@@ -250,13 +249,13 @@ class Client
         $response = \json_decode($content, true);
 
         if (isset($response['error']) && is_array($response['error']) && !empty($response['error'])) {
-            if (!$this->authenticationRequest && !$this->isAuthenticated()) {
-                $this->authenticate();
-                return $this->request($method, $params);
-            }
             $error = $response['error'];
             $message = isset($error['message']) ? $error['message'] : 'Unknown Error while fetching connector response';
             $code = isset($error['code']) ? $error['code'] : ResponseException::UNKNOWN_ERROR;
+            if (!$this->authenticationRequest && $code === ResponseException::SESSION_INVALID) {
+                $this->authenticate();
+                return $this->request($method, $params);
+            }
             throw ResponseException::responseError($message, $code);
         }
 
