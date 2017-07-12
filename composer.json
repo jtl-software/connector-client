@@ -15,14 +15,9 @@
       "reference": "origin/master"
     }
   ],
-  "extra": {
-    "branch-alias": {
-      "dev-develop": "2.4.x-dev"
-    }
-  },
   "require": {
     "guzzlehttp/guzzle": "^6.3",
-    "jtl/connector": "dev-develop as 2.4.x-dev"
+    "jtl/connector": "dev-develop as 2.4.6"
   },
   "autoload": {
     "psr-4": {
