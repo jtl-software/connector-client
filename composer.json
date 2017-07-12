@@ -16,7 +16,7 @@
     }
   ],
   "require": {
-    "jtl/connector": "^2.4",
+    "jtl/connector": "dev-develop",
     "guzzlehttp/guzzle": "^6.3"
   },
   "autoload": {

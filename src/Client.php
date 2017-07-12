@@ -7,6 +7,7 @@ namespace jtl\Connector\Client;
 
 use JMS\Serializer\Serializer;
 use jtl\Connector\Model\Ack;
+use jtl\Connector\Model\ConnectorIdentification;
 use jtl\Connector\Model\DataModel;
 use jtl\Connector\Serializer\JMS\SerializerBuilder;
 
@@ -142,7 +143,9 @@ class Client
      */
     public function identify()
     {
-        return $this->request(self::METHOD_IDENTIFY);
+        $json =  \json_encode($this->request(self::METHOD_IDENTIFY));
+        $ns = ConnectorIdentification::class;
+        return $this->serializer->deserialize($json, $ns, 'json');
     }
 
     /**
