@@ -49,11 +49,6 @@ class Client
     protected $sessionId;
 
     /**
-     * @var boolean
-     */
-    protected $authenticationRequest = false;
-
-    /**
      * @var Serializer
      */
     protected $serializer;
@@ -82,23 +77,14 @@ class Client
      */
     public function authenticate()
     {
+        $this->sessionId = null;
         $params = ['token' => $this->token];
-        $this->authenticationRequest = true;
-        try {
-            $result = $this->request(self::METHOD_AUTH, $params);
-        } catch (\Exception $ex) {
-            $this->authenticationRequest = false;
-            throw $ex;
-        }
-        $this->authenticationRequest = false;
+        $result = $this->request(self::METHOD_AUTH, $params, true);
 
         if(is_array($result)
             && isset($result['sessionId'])
             && !empty($result['sessionId'])) {
             $this->sessionId = $result['sessionId'];
-        }
-        else {
-            $this->sessionId = null;
         }
     }
 
@@ -112,13 +98,11 @@ class Client
         }
 
         try {
-            $this->authenticationRequest = true;
-            $this->features();
+            $this->request(self::METHOD_IDENTIFY, [], true);
         } catch (ResponseException $ex) {
-            $this->authenticationRequest = false;
             return false;
         }
-        $this->authenticationRequest = false;
+
         return true;
     }
 
@@ -232,12 +216,13 @@ class Client
     /**
      * @param string $method
      * @param mixed[] $params
+     * @param boolean $authRequest
      * @return mixed[]
      * @throws ResponseException
      */
-    protected function request($method, array $params = [])
+    protected function request($method, array $params = [], $authRequest = false)
     {
-        if(!$this->authenticationRequest && $this->sessionId === null) {
+        if(!$authRequest && $this->sessionId === null) {
             $this->authenticate();
         }
 
@@ -255,7 +240,7 @@ class Client
             $error = $response['error'];
             $message = isset($error['message']) ? $error['message'] : 'Unknown Error while fetching connector response';
             $code = isset($error['code']) ? (int)$error['code'] : ResponseException::UNKNOWN_ERROR;
-            if (!$this->authenticationRequest && $code === ResponseException::SESSION_INVALID) {
+            if (!$authRequest && $code === ResponseException::SESSION_INVALID) {
                 $this->authenticate();
                 return $this->request($method, $params);
             }
