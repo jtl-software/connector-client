@@ -139,7 +139,7 @@ class Client
     }
 
     /**
-     * @return mixed[]
+     * @return ConnectorIdentification
      */
     public function identify()
     {
