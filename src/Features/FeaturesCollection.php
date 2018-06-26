@@ -115,6 +115,27 @@ class FeaturesCollection
     }
 
     /**
+     * @return array
+     */
+    public function toArray()
+    {
+        $data = [
+            'entities' => [],
+            'flags' => [],
+        ];
+
+        foreach($this->entities as $entity) {
+            $data['entities'][$entity->getName()] = $entity->toArray();
+        }
+
+        foreach ($this->flags as $flag) {
+            $data['flags'][$flag->getName()] = $flag->isActive();
+        }
+
+        return $data;
+    }
+
+    /**
      * @param FeatureEntity[] $entities
      * @param FeatureFlag[] $flags
      * @return FeaturesCollection

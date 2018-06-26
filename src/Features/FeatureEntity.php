@@ -104,4 +104,16 @@ class FeatureEntity
         $this->delete = $delete;
         return $this;
     }
+
+    /**
+     * @return boolean[]
+     */
+    public function toArray()
+    {
+        return [
+            'pull' => $this->canPull(),
+            'push' => $this->canPush(),
+            'delete' => $this->canDelete(),
+        ];
+    }
 }
