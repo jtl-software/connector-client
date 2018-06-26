@@ -111,7 +111,7 @@ class Client
     }
 
     /**
-     * @return mixed[]
+     * @return FeaturesCollection
      * @throws ResponseException
      */
     public function features()
