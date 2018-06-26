@@ -6,6 +6,9 @@
 namespace jtl\Connector\Client;
 
 use JMS\Serializer\Serializer;
+use jtl\Connector\Client\Features\FeatureEntity;
+use jtl\Connector\Client\Features\FeatureFlag;
+use jtl\Connector\Client\Features\FeaturesCollection;
 use jtl\Connector\Model\Ack;
 use jtl\Connector\Model\ConnectorIdentification;
 use jtl\Connector\Model\DataModel;
@@ -20,6 +23,7 @@ class Client
     const METHOD_AUTH = 'core.connector.auth';
     const METHOD_FEATURES = 'core.connector.features';
     const METHOD_IDENTIFY = 'connector.identify';
+    const METHOD_FINISH = 'connector.finish';
     const METHOD_CLEAR = 'core.linker.clear';
 
     const DATA_FORMAT_JSON = 'json';
@@ -73,7 +77,7 @@ class Client
 
     /**
      * @return void
-     * @throws \Exception
+     * @throws ResponseException
      */
     public function authenticate()
     {
@@ -108,14 +112,39 @@ class Client
 
     /**
      * @return mixed[]
+     * @throws ResponseException
      */
     public function features()
     {
-        return $this->request(self::METHOD_FEATURES);
+        $response = $this->request(self::METHOD_FEATURES);
+
+        $entities = [];
+        if(isset($response['entities']) && is_array($response['entities'])) {
+            foreach($response['entities'] as $name => $methods) {
+                $entity = new FeatureEntity($name);
+                foreach($methods as $methodName => $value) {
+                    $setter = 'set' . ucfirst($methodName);
+                    if(method_exists($entity, $setter)) {
+                        $entity->$setter($value);
+                    }
+                }
+                $entities[] = $entity;
+            }
+        }
+
+        $flags = [];
+        if(isset($response['flags']) && is_array($response['flags'])) {
+            foreach($response['flags'] as $name => $value) {
+                $flags[] = new FeatureFlag($name, $value);
+            }
+        }
+
+        return FeaturesCollection::create($entities, $flags);
     }
 
     /**
      * @return boolean
+     * @throws ResponseException
      */
     public function clear()
     {
@@ -124,6 +153,7 @@ class Client
 
     /**
      * @return ConnectorIdentification
+     * @throws ResponseException
      */
     public function identify()
     {
@@ -133,11 +163,21 @@ class Client
     }
 
     /**
+     * @return mixed[]
+     * @throws ResponseException
+     */
+    public function finish()
+    {
+        return $this->request(self::METHOD_FINISH);
+    }
+
+    /**
      * @param string $controllerName
      * @param integer $limit
      * @param string $responseFormat
      * @return DataModel[]
-     * @throws \Exception
+     * @throws \RuntimeException
+     * @throws ResponseException
      */
     public function pull($controllerName, $limit = self::DEFAULT_PULL_LIMIT, $responseFormat = self::DATA_FORMAT_OBJECT)
     {
@@ -147,7 +187,7 @@ class Client
 
         $className = 'jtl\\Connector\\Model\\' . $this->underscoreToCamelCase($controllerName);
         if(!is_subclass_of($className, \jtl\Connector\Model\DataModel::class)){
-            throw new \Exception($className . ' does not inherit from ' . \jtl\Connector\Model\DataModel::class . '!');
+            throw new \RuntimeException($className . ' does not inherit from ' . \jtl\Connector\Model\DataModel::class . '!');
         }
 
         switch($responseFormat){
@@ -167,6 +207,7 @@ class Client
      * @param string $controllerName
      * @param mixed[] $entities
      * @return mixed[]
+     * @throws ResponseException
      */
     public function push($controllerName, array $entities)
     {
@@ -178,6 +219,7 @@ class Client
     /**
      * @param Ack $ack
      * @return mixed[]
+     * @throws ResponseException
      */
     public function ack(Ack $ack)
     {
