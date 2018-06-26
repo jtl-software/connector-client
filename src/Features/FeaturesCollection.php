@@ -89,7 +89,7 @@ class FeaturesCollection
         if($this->hasFlag($name)) {
             return $this->flags[$name]->isActive();
         }
-        throw new \RuntimeException('A flag with the name ' . $name . ' does not exist!');
+        return false;
     }
 
     /**
