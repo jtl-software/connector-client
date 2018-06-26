@@ -54,7 +54,7 @@ class FeatureEntity
     /**
      * @return bool
      */
-    public function pull(): bool
+    public function canPull(): bool
     {
         return $this->pull;
     }
@@ -72,7 +72,7 @@ class FeatureEntity
     /**
      * @return bool
      */
-    public function push(): bool
+    public function canPush(): bool
     {
         return $this->push;
     }
@@ -90,7 +90,7 @@ class FeatureEntity
     /**
      * @return bool
      */
-    public function delete(): bool
+    public function canDelete(): bool
     {
         return $this->delete;
     }
