@@ -142,6 +142,22 @@ class FeaturesCollection
      */
     public static function create(array $entities = [], array $flags = []): FeaturesCollection
     {
-        return new static($entities, $flags);
+        $featureEntities = [];
+        foreach ($entities as $name => $methods) {
+            $entity = new FeatureEntity($name);
+            foreach ($methods as $methodName => $value) {
+                $setter = 'set' . ucfirst($methodName);
+                if (method_exists($entity, $setter)) {
+                    $entity->$setter($value);
+                }
+            }
+            $featureEntities[] = $entity;
+        }
+
+        $featureFlags = [];
+        foreach ($flags as $name => $value) {
+            $featureFlags[] = new FeatureFlag($name, $value);
+        }
+        return new static($featureEntities, $featureFlags);
     }
 }

@@ -120,23 +120,12 @@ class Client
 
         $entities = [];
         if(isset($response['entities']) && is_array($response['entities'])) {
-            foreach($response['entities'] as $name => $methods) {
-                $entity = new FeatureEntity($name);
-                foreach($methods as $methodName => $value) {
-                    $setter = 'set' . ucfirst($methodName);
-                    if(method_exists($entity, $setter)) {
-                        $entity->$setter($value);
-                    }
-                }
-                $entities[] = $entity;
-            }
+            $entities = $response['entities'];
         }
 
         $flags = [];
         if(isset($response['flags']) && is_array($response['flags'])) {
-            foreach($response['flags'] as $name => $value) {
-                $flags[] = new FeatureFlag($name, $value);
-            }
+            $flags = $response['flags'];
         }
 
         return FeaturesCollection::create($entities, $flags);
