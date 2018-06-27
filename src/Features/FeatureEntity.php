@@ -5,28 +5,41 @@
  */
 namespace jtl\Connector\Client\Features;
 
+use JMS\Serializer\Annotation as Serializer;
 
 class FeatureEntity
 {
     /**
      * @var string
+     * @Serializer\Type("string")
+     * @Serializer\SerializedName("name")
+     * @Serializer\Accessor(getter="getName",setter="setName")
      */
-    protected $name;
+    protected $name = '';
 
     /**
      * @var boolean
+     * @Serializer\Type("boolean")
+     * @Serializer\SerializedName("pull")
+     * @Serializer\Accessor(getter="canPull",setter="setPull")
      */
-    protected $pull;
+    protected $pull = false;
 
     /**
      * @var boolean
+     * @Serializer\Type("boolean")
+     * @Serializer\SerializedName("push")
+     * @Serializer\Accessor(getter="canPush",setter="setPush")
      */
-    protected $push;
+    protected $push = false;
 
     /**
      * @var boolean
+     * @Serializer\Type("boolean")
+     * @Serializer\SerializedName("delete")
+     * @Serializer\Accessor(getter="canDelete",setter="setDelete")
      */
-    protected $delete;
+    protected $delete = false;
 
     /**
      * FeatureEntity constructor.
@@ -49,6 +62,16 @@ class FeatureEntity
     public function getName(): string
     {
         return $this->name;
+    }
+
+    /**
+     * @param string $name
+     * @return FeatureEntity
+     */
+    public function setName(string $name): FeatureEntity
+    {
+        $this->name = $name;
+        return $this;
     }
 
     /**

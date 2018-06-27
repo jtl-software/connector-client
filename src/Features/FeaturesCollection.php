@@ -5,15 +5,23 @@
  */
 namespace jtl\Connector\Client\Features;
 
+use JMS\Serializer\Annotation as Serializer;
+
 class FeaturesCollection
 {
     /**
      * @var FeatureEntity[]
+     * @Serializer\Type("array<jtl\Connector\Client\Features\FeatureEntity>")
+     * @Serializer\SerializedName("entities")
+     * @Serializer\Accessor(getter="getEntities",setter="setEntities")
      */
     protected $entities = [];
 
     /**
      * @var FeatureFlag[]
+     * @Serializer\Type("array<jtl\Connector\Client\Features\FeatureFlag>")
+     * @Serializer\SerializedName("flags")
+     * @Serializer\Accessor(getter="getFlags",setter="setFlags")
      */
     protected $flags = [];
 
@@ -24,8 +32,8 @@ class FeaturesCollection
      */
     public function __construct(array $entities = [], array $flags = [])
     {
-        $this->setEntities(...$entities);
-        $this->setFlags(...$flags);
+        $this->setEntities($entities);
+        $this->setFlags($flags);
     }
 
     /**
@@ -50,10 +58,18 @@ class FeaturesCollection
     }
 
     /**
-     * @param FeatureEntity ...$entities
+     * @return FeatureEntity[]
+     */
+    public function getEntities(): array
+    {
+        return $this->entities;
+    }
+
+    /**
+     * @param FeatureEntity[] $entities
      * @return FeaturesCollection
      */
-    public function setEntities(FeatureEntity ...$entities): FeaturesCollection
+    public function setEntities(array $entities): FeaturesCollection
     {
         foreach($entities as $entity) {
             $this->setEntity($entity);
@@ -93,10 +109,18 @@ class FeaturesCollection
     }
 
     /**
-     * @param FeatureFlag ...$flags
+     * @return FeatureFlag[]
+     */
+    public function getFlags(): array
+    {
+        return $this->flags;
+    }
+
+    /**
+     * @param FeatureFlag[] $flags
      * @return FeaturesCollection
      */
-    public function setFlags(FeatureFlag ...$flags): FeaturesCollection
+    public function setFlags(array $flags): FeaturesCollection
     {
         foreach($flags as $flag) {
             $this->setFlag($flag);

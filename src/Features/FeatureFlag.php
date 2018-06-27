@@ -5,18 +5,25 @@
  */
 namespace jtl\Connector\Client\Features;
 
+use JMS\Serializer\Annotation as Serializer;
 
 class FeatureFlag
 {
     /**
      * @var string
+     * @Serializer\Type("string")
+     * @Serializer\SerializedName("name")
+     * @Serializer\Accessor(getter="getName",setter="setName")
      */
-    protected $name;
+    protected $name = '';
 
     /**
      * @var boolean
+     * @Serializer\Type("boolean")
+     * @Serializer\SerializedName("active")
+     * @Serializer\Accessor(getter="isActive",setter="setActive")
      */
-    protected $active;
+    protected $active = false;
 
     /**
      * FeatureFlag constructor.
@@ -38,10 +45,30 @@ class FeatureFlag
     }
 
     /**
+     * @param string $name
+     * @return FeatureFlag
+     */
+    public function setName(string $name): FeatureFlag
+    {
+        $this->name = $name;
+        return $this;
+    }
+
+    /**
      * @return bool
      */
     public function isActive(): bool
     {
         return $this->active;
+    }
+
+    /**
+     * @param bool $active
+     * @return FeatureFlag
+     */
+    public function setActive(bool $active): FeatureFlag
+    {
+        $this->active = $active;
+        return $this;
     }
 }

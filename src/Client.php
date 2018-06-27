@@ -6,8 +6,6 @@
 namespace jtl\Connector\Client;
 
 use JMS\Serializer\Serializer;
-use jtl\Connector\Client\Features\FeatureEntity;
-use jtl\Connector\Client\Features\FeatureFlag;
 use jtl\Connector\Client\Features\FeaturesCollection;
 use jtl\Connector\Model\Ack;
 use jtl\Connector\Model\ConnectorIdentification;
