@@ -239,6 +239,7 @@ class Client
     public function setToken($token)
     {
         $this->token = $token;
+        $this->sessionId = null;
         return $this;
     }
 
@@ -255,13 +256,8 @@ class Client
             $this->authenticate();
         }
 
-        $url = $this->endpointUrl;
-        if($this->sessionId !== null && strlen($this->sessionId) > 0) {
-            $url .= '?jtlauth=' . $this->sessionId;
-        }
-
         $requestId = uniqid();
-        $result = $this->client->post($url, ['body' => $this->createRequestBody($requestId, $method, $params)]);
+        $result = $this->client->post($this->endpointUrl, ['form_params' => $this->createRequestParams($requestId, $method, $params)]);
         $content = $result->getBody()->getContents();
         $response = \json_decode($content, true);
 
@@ -289,21 +285,25 @@ class Client
      * @param mixed[] $params
      * @return string
      */
-    protected function createRequestBody($requestId, $method, array $params = [])
+    protected function createRequestParams($requestId, $method, array $params = [])
     {
-        $data = [
+        $rpcData = [
           'method' => $method,
         ];
 
         if(count($params) > 0) {
-            $data['params'] = $params;
+            $rpcData['params'] = $params;
         }
 
-        $data['jtlrpc'] = self::JTL_RPC_VERSION;
-        $data['id'] = $requestId;
+        $rpcData['jtlrpc'] = self::JTL_RPC_VERSION;
+        $rpcData['id'] = $requestId;
 
-        $requestBody = 'jtlrpc=' . \json_encode($data);
-        return $requestBody;
+        $requestParams = ['jtlrpc' => \json_encode($rpcData)];
+        if(!is_null($this->sessionId) && strlen($this->sessionId) > 0) {
+            $requestParams['jtlauth'] = $this->sessionId;
+        }
+
+        return $requestParams;
     }
 
     /**
