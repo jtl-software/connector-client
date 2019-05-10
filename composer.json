@@ -14,7 +14,7 @@
   },
   "autoload": {
     "psr-4": {
-      "jtl\\Connector\\Client\\": "src/"
+      "Jtl\\Connector\\Client\\": "src/"
     }
   }
 }

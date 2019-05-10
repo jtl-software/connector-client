@@ -3,7 +3,7 @@
  * @author Immanuel Klinkenberg <immanuel.klinkenberg@jtl-software.com>
  * @copyright 2010-2018 JTL-Software GmbH
  */
-namespace jtl\Connector\Client\Features;
+namespace Jtl\Connector\Client\Features;
 
 use JMS\Serializer\Annotation as Serializer;
 
@@ -11,7 +11,7 @@ class FeaturesCollection
 {
     /**
      * @var FeatureEntity[]
-     * @Serializer\Type("array<jtl\Connector\Client\Features\FeatureEntity>")
+     * @Serializer\Type("array<Jtl\Connector\Client\Features\FeatureEntity>")
      * @Serializer\SerializedName("entities")
      * @Serializer\Accessor(getter="getEntities",setter="setEntities")
      */
@@ -19,7 +19,7 @@ class FeaturesCollection
 
     /**
      * @var FeatureFlag[]
-     * @Serializer\Type("array<jtl\Connector\Client\Features\FeatureFlag>")
+     * @Serializer\Type("array<Jtl\Connector\Client\Features\FeatureFlag>")
      * @Serializer\SerializedName("flags")
      * @Serializer\Accessor(getter="getFlags",setter="setFlags")
      */

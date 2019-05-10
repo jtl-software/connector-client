@@ -3,9 +3,9 @@
  * @author Immanuel Klinkenberg <immanuel.klinkenberg@jtl-software.com>
  * @copyright 2010-2017 JTL-Software GmbH
  */
-namespace jtl\Connector\Client;
+namespace Jtl\Connector\Client;
 
-class ResponseException extends Exception
+class ResponseException extends RuntimeException
 {
     const UNKNOWN_ERROR = 10;
     const INDEX_NOT_FOUND = 20;
@@ -17,7 +17,7 @@ class ResponseException extends Exception
      * @param integer $code
      * @return ResponseException
      */
-    static public function responseError($message, $code)
+    public static function responseError($message, $code)
     {
         return new self($message, $code);
     }
@@ -28,7 +28,7 @@ class ResponseException extends Exception
      * @param string $method
      * @return ResponseException
      */
-    static public function indexNotFound($index, $controller, $method)
+    public static function indexNotFound($index, $controller, $method)
     {
         $msg = "Missing index '" . $index . "' in response for method '" . $method . "' in controller '" . $controller . "'!";
         return new self($msg, self::INDEX_NOT_FOUND);
@@ -37,7 +37,7 @@ class ResponseException extends Exception
     /**
      * @return ResponseException
      */
-    static public function unknownError()
+    public static function unknownError()
     {
         return new self('Unknown error occured while fetching response!', self::UNKNOWN_ERROR);
     }
