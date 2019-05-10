@@ -174,7 +174,7 @@ class Client
 
         $className = 'jtl\\Connector\\Model\\' . $this->underscoreToCamelCase($controllerName);
         if(!is_subclass_of($className, \jtl\Connector\Model\DataModel::class)){
-            throw new \RuntimeException($className . ' does not inherit from ' . \jtl\Connector\Model\DataModel::class . '!');
+            throw new RuntimeException($className . ' does not inherit from ' . \jtl\Connector\Model\DataModel::class . '!');
         }
 
         switch($responseFormat){
