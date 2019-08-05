@@ -257,7 +257,11 @@ class Client
         }
 
         $requestId = uniqid();
-        $result = $this->client->post($this->endpointUrl, ['form_params' => $this->createRequestParams($requestId, $method, $params)]);
+        $requestBodyIndex = 'form_params';
+        if(version_compare(\GuzzleHttp\Client::VERSION, '6.0.0', '<')) {
+            $requestBodyIndex = 'body';
+        }
+        $result = $this->client->post($this->endpointUrl, [$requestBodyIndex => $this->createRequestParams($requestId, $method, $params)]);
         $content = $result->getBody()->getContents();
         $response = \json_decode($content, true);
 
