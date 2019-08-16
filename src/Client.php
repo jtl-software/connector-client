@@ -3,6 +3,7 @@
  * @author Immanuel Klinkenberg <immanuel.klinkenberg@jtl-software.com>
  * @copyright 2010-2017 JTL-Software GmbH
  */
+
 namespace Jtl\Connector\Client;
 
 use JMS\Serializer\Serializer;
@@ -61,6 +62,13 @@ class Client
     protected $responseFormat = self::DATA_FORMAT_OBJECT;
 
     /**
+     * @var string[]
+     */
+    protected static $responseFormats = [
+      self::DATA_FORMAT_ARRAY, self::DATA_FORMAT_JSON, self::DATA_FORMAT_OBJECT
+    ];
+
+    /**
      * Client constructor.
      * @param string $token
      * @param string $endpointUrl
@@ -70,7 +78,7 @@ class Client
     {
         $this->token = $token;
         $this->endpointUrl = $endpointUrl;
-        if($client === null) {
+        if ($client === null) {
             $client = new \GuzzleHttp\Client();
         }
 
@@ -88,7 +96,7 @@ class Client
         $params = ['token' => $this->token];
         $result = $this->request(self::METHOD_AUTH, $params, true);
 
-        if(is_array($result)
+        if (is_array($result)
             && isset($result['sessionId'])
             && !empty($result['sessionId'])) {
             $this->sessionId = $result['sessionId'];
@@ -100,7 +108,7 @@ class Client
      */
     public function isAuthenticated()
     {
-        if($this->sessionId === null) {
+        if ($this->sessionId === null) {
             return false;
         }
 
@@ -122,12 +130,12 @@ class Client
         $response = $this->request(self::METHOD_FEATURES);
 
         $entities = [];
-        if(isset($response['entities']) && is_array($response['entities'])) {
+        if (isset($response['entities']) && is_array($response['entities'])) {
             $entities = $response['entities'];
         }
 
         $flags = [];
-        if(isset($response['flags']) && is_array($response['flags'])) {
+        if (isset($response['flags']) && is_array($response['flags'])) {
             $flags = $response['flags'];
         }
 
@@ -149,7 +157,7 @@ class Client
      */
     public function identify()
     {
-        $json =  \json_encode($this->request(self::METHOD_IDENTIFY));
+        $json = \json_encode($this->request(self::METHOD_IDENTIFY));
         $ns = ConnectorIdentification::class;
         return $this->serializer->deserialize($json, $ns, 'json');
     }
@@ -173,7 +181,7 @@ class Client
     public function pull($controllerName, $limit = self::DEFAULT_PULL_LIMIT)
     {
         $params['limit'] = $limit;
-        return  $this->requestAndPrepare($controllerName, 'pull', $params);
+        return $this->requestAndPrepare($controllerName, 'pull', $params);
     }
 
     /**
@@ -222,7 +230,7 @@ class Client
         $params['limit'] = 0;
         $response = $this->request($method, $params);
 
-        if(!isset($response['available'])) {
+        if (!isset($response['available'])) {
             throw ResponseException::indexNotFound('available', $controllerName, 'statistic');
         }
 
@@ -249,11 +257,17 @@ class Client
     }
 
     /**
-     * @param string $responseFormat
+     * @param string $format
+     * @return Client
      */
-    public function setResponseFormat($responseFormat)
+    public function setResponseFormat($format)
     {
-        $this->responseFormat = $responseFormat;
+        if(!self::isValidResponseFormat($format)) {
+            throw new RuntimeException(sprintf('%s is not a valid response format!', $format));
+        }
+
+        $this->responseFormat = $format;
+        return $this;
     }
 
     /**
@@ -266,14 +280,13 @@ class Client
     {
         $method = $controllerName . '.' . $action;
         $entitiesData = $this->request($method, $params);
-
-        $className = 'jtl\\Connector\\Model\\' . $this->underscoreToCamelCase($controllerName);
-        if(!is_subclass_of($className, \jtl\Connector\Model\DataModel::class)){
-            throw new RuntimeException($className . ' does not inherit from ' . \jtl\Connector\Model\DataModel::class . '!');
-        }
-
-        switch($this->responseFormat){
+        switch ($this->responseFormat) {
             case self::DATA_FORMAT_OBJECT:
+                $className = 'jtl\\Connector\\Model\\' . $this->underscoreToCamelCase($controllerName);
+                if (!is_subclass_of($className, \jtl\Connector\Model\DataModel::class)) {
+                    throw new RuntimeException($className . ' does not inherit from ' . \jtl\Connector\Model\DataModel::class . '!');
+                }
+
                 $ns = 'ArrayCollection<' . $className . '>';
                 return $this->serializer->deserialize(\json_encode($entitiesData), $ns, 'json');
                 break;
@@ -281,6 +294,7 @@ class Client
                 return \json_encode($entitiesData);
                 break;
         }
+        return $entitiesData;
     }
 
     /**
@@ -292,13 +306,13 @@ class Client
      */
     protected function request($method, array $params = [], $authRequest = false)
     {
-        if(!$authRequest && $this->sessionId === null) {
+        if (!$authRequest && $this->sessionId === null) {
             $this->authenticate();
         }
 
         $requestId = uniqid();
         $requestBodyIndex = 'form_params';
-        if(version_compare(\GuzzleHttp\Client::VERSION, '6.0.0', '<')) {
+        if (version_compare(\GuzzleHttp\Client::VERSION, '6.0.0', '<')) {
             $requestBodyIndex = 'body';
         }
         $result = $this->client->post($this->endpointUrl, [$requestBodyIndex => $this->createRequestParams($requestId, $method, $params)]);
@@ -332,10 +346,10 @@ class Client
     protected function createRequestParams($requestId, $method, array $params = [])
     {
         $rpcData = [
-          'method' => $method,
+            'method' => $method,
         ];
 
-        if(count($params) > 0) {
+        if (count($params) > 0) {
             $rpcData['params'] = $params;
         }
 
@@ -343,7 +357,7 @@ class Client
         $rpcData['id'] = $requestId;
 
         $requestParams = ['jtlrpc' => \json_encode($rpcData)];
-        if(!is_null($this->sessionId) && strlen($this->sessionId) > 0) {
+        if (!is_null($this->sessionId) && strlen($this->sessionId) > 0) {
             $requestParams['jtlauth'] = $this->sessionId;
         }
 
@@ -357,9 +371,18 @@ class Client
     protected function underscoreToCamelCase($string)
     {
         $camelCase = '';
-        foreach(explode('_', $string) as $part) {
+        foreach (explode('_', $string) as $part) {
             $camelCase .= ucfirst($part);
         }
         return $camelCase;
+    }
+
+    /**
+     * @param string $format
+     * @return bool
+     */
+    public static function isValidResponseFormat($format)
+    {
+        return in_array($format, self::$responseFormats);
     }
 }
