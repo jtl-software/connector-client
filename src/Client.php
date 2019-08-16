@@ -56,6 +56,11 @@ class Client
     protected $serializer;
 
     /**
+     * @var string
+     */
+    protected $responseFormat = self::DATA_FORMAT_OBJECT;
+
+    /**
      * Client constructor.
      * @param string $token
      * @param string $endpointUrl
@@ -161,33 +166,14 @@ class Client
     /**
      * @param string $controllerName
      * @param integer $limit
-     * @param string $responseFormat
      * @return DataModel[]
      * @throws \RuntimeException
      * @throws ResponseException
      */
-    public function pull($controllerName, $limit = self::DEFAULT_PULL_LIMIT, $responseFormat = self::DATA_FORMAT_OBJECT)
+    public function pull($controllerName, $limit = self::DEFAULT_PULL_LIMIT)
     {
-        $method = $controllerName . '.pull';
         $params['limit'] = $limit;
-        $entitiesData = $this->request($method, $params);
-
-        $className = 'jtl\\Connector\\Model\\' . $this->underscoreToCamelCase($controllerName);
-        if(!is_subclass_of($className, \jtl\Connector\Model\DataModel::class)){
-            throw new RuntimeException($className . ' does not inherit from ' . \jtl\Connector\Model\DataModel::class . '!');
-        }
-
-        switch($responseFormat){
-            case self::DATA_FORMAT_OBJECT:
-                $ns = 'ArrayCollection<' . $className . '>';
-                return $this->serializer->deserialize(\json_encode($entitiesData), $ns, 'json');
-                break;
-            case self::DATA_FORMAT_JSON:
-                return \json_encode($entitiesData);
-                break;
-        }
-
-        return $entitiesData;
+        return  $this->requestAndPrepare($controllerName, 'pull', $params);
     }
 
     /**
@@ -198,9 +184,20 @@ class Client
      */
     public function push($controllerName, array $entities)
     {
-        $method = $controllerName . '.push';
         $serialized = $this->serializer->serialize($entities, 'json');
-        return $this->request($method, \json_decode($serialized, true));
+        return $this->requestAndPrepare($controllerName, 'push', \json_decode($serialized, true));
+    }
+
+    /**
+     * @param string $controllerName
+     * @param mixed[] $entities
+     * @return mixed[]
+     * @throws ResponseException
+     */
+    public function delete($controllerName, array $entities)
+    {
+        $serialized = $this->serializer->serialize($entities, 'json');
+        return $this->requestAndPrepare($controllerName, 'delete', \json_decode($serialized, true));
     }
 
     /**
@@ -241,6 +238,49 @@ class Client
         $this->token = $token;
         $this->sessionId = null;
         return $this;
+    }
+
+    /**
+     * @return string
+     */
+    public function getResponseFormat()
+    {
+        return $this->responseFormat;
+    }
+
+    /**
+     * @param string $responseFormat
+     */
+    public function setResponseFormat($responseFormat)
+    {
+        $this->responseFormat = $responseFormat;
+    }
+
+    /**
+     * @param string $controllerName
+     * @param string $action
+     * @param array $params
+     * @return string|mixed[]|object[]|object
+     */
+    protected function requestAndPrepare($controllerName, $action, array $params = [])
+    {
+        $method = $controllerName . '.' . $action;
+        $entitiesData = $this->request($method, $params);
+
+        $className = 'jtl\\Connector\\Model\\' . $this->underscoreToCamelCase($controllerName);
+        if(!is_subclass_of($className, \jtl\Connector\Model\DataModel::class)){
+            throw new RuntimeException($className . ' does not inherit from ' . \jtl\Connector\Model\DataModel::class . '!');
+        }
+
+        switch($this->responseFormat){
+            case self::DATA_FORMAT_OBJECT:
+                $ns = 'ArrayCollection<' . $className . '>';
+                return $this->serializer->deserialize(\json_encode($entitiesData), $ns, 'json');
+                break;
+            case self::DATA_FORMAT_JSON:
+                return \json_encode($entitiesData);
+                break;
+        }
     }
 
     /**
