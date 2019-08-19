@@ -106,7 +106,7 @@ class Client
     /**
      * @return boolean
      */
-    public function isAuthenticated()
+    public function isAuthenticated(): bool
     {
         if ($this->sessionId === null) {
             return false;
@@ -125,7 +125,7 @@ class Client
      * @return FeaturesCollection
      * @throws ResponseException
      */
-    public function features()
+    public function features(): FeaturesCollection
     {
         $response = $this->request(self::METHOD_FEATURES);
 
@@ -146,7 +146,7 @@ class Client
      * @return boolean
      * @throws ResponseException
      */
-    public function clear()
+    public function clear(): bool
     {
         return $this->request(self::METHOD_CLEAR);
     }
@@ -155,7 +155,7 @@ class Client
      * @return ConnectorIdentification
      * @throws ResponseException
      */
-    public function identify()
+    public function identify(): ConnectorIdentification
     {
         $json = \json_encode($this->request(self::METHOD_IDENTIFY));
         $ns = ConnectorIdentification::class;
@@ -174,14 +174,13 @@ class Client
     /**
      * @param string $controllerName
      * @param integer $limit
-     * @return DataModel[]
+     * @return DataModel[]|mixed[]|string
      * @throws \RuntimeException
      * @throws ResponseException
      */
-    public function pull($controllerName, $limit = self::DEFAULT_PULL_LIMIT)
+    public function pull(string $controllerName, int $limit = self::DEFAULT_PULL_LIMIT)
     {
-        $params['limit'] = $limit;
-        return $this->requestAndPrepare($controllerName, 'pull', $params);
+        return $this->requestAndPrepare($controllerName, 'pull', ['limit' => $limit]);
     }
 
     /**
@@ -190,7 +189,7 @@ class Client
      * @return mixed[]
      * @throws ResponseException
      */
-    public function push($controllerName, array $entities)
+    public function push(string $controllerName, array $entities)
     {
         $serialized = $this->serializer->serialize($entities, 'json');
         return $this->requestAndPrepare($controllerName, 'push', \json_decode($serialized, true));
@@ -202,7 +201,7 @@ class Client
      * @return mixed[]
      * @throws ResponseException
      */
-    public function delete($controllerName, array $entities)
+    public function delete(string $controllerName, array $entities)
     {
         $serialized = $this->serializer->serialize($entities, 'json');
         return $this->requestAndPrepare($controllerName, 'delete', \json_decode($serialized, true));
@@ -224,7 +223,7 @@ class Client
      * @return integer
      * @throws ResponseException
      */
-    public function statistic($controllerName)
+    public function statistic(string $controllerName): int
     {
         $method = $controllerName . '.statistic';
         $params['limit'] = 0;
@@ -241,7 +240,7 @@ class Client
      * @param string $token
      * @return Client
      */
-    public function setToken($token)
+    public function setToken(string $token): Client
     {
         $this->token = $token;
         $this->sessionId = null;
@@ -251,7 +250,7 @@ class Client
     /**
      * @return string
      */
-    public function getResponseFormat()
+    public function getResponseFormat(): string
     {
         return $this->responseFormat;
     }
@@ -260,7 +259,7 @@ class Client
      * @param string $format
      * @return Client
      */
-    public function setResponseFormat($format)
+    public function setResponseFormat(string $format): Client
     {
         if(!self::isValidResponseFormat($format)) {
             throw new RuntimeException(sprintf('%s is not a valid response format!', $format));
@@ -276,7 +275,7 @@ class Client
      * @param array $params
      * @return string|mixed[]|object[]|object
      */
-    protected function requestAndPrepare($controllerName, $action, array $params = [])
+    protected function requestAndPrepare(string $controllerName, string $action, array $params = [])
     {
         $method = $controllerName . '.' . $action;
         $entitiesData = $this->request($method, $params);
@@ -304,7 +303,7 @@ class Client
      * @return mixed[]
      * @throws ResponseException
      */
-    protected function request($method, array $params = [], $authRequest = false)
+    protected function request(string $method, array $params = [],bool $authRequest = false): array
     {
         if (!$authRequest && $this->sessionId === null) {
             $this->authenticate();
@@ -341,9 +340,9 @@ class Client
      * @param string $requestId
      * @param string $method
      * @param mixed[] $params
-     * @return string
+     * @return string[]
      */
-    protected function createRequestParams($requestId, $method, array $params = [])
+    protected function createRequestParams(string $requestId, string $method, array $params = []): array
     {
         $rpcData = [
             'method' => $method,
@@ -368,7 +367,7 @@ class Client
      * @param string $string
      * @return string
      */
-    protected function underscoreToCamelCase($string)
+    protected function underscoreToCamelCase(string $string): string
     {
         $camelCase = '';
         foreach (explode('_', $string) as $part) {
@@ -381,7 +380,7 @@ class Client
      * @param string $format
      * @return bool
      */
-    public static function isValidResponseFormat($format)
+    public static function isValidResponseFormat(string $format): bool
     {
         return in_array($format, self::$responseFormats);
     }
