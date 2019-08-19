@@ -1,4 +1,5 @@
 .idea
 vendor
-test/basic
+tests/basic
 composer.lock
+.phpunit.result.cache
