@@ -2,7 +2,7 @@
   "name": "jtl/connector-client",
   "description": "A php client for jtl connectors.",
   "type": "project",
-  "license": "GPL-3.0-or-later",
+  "license": "LGPL-3.0-or-later",
   "authors": [
     {
       "name": "Immanuel Klinkenberg",
