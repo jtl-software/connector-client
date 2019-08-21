@@ -12,6 +12,7 @@ use jtl\Connector\Model\Ack;
 use jtl\Connector\Model\ConnectorIdentification;
 use jtl\Connector\Model\DataModel;
 use jtl\Connector\Serializer\JMS\SerializerBuilder;
+use GuzzleHttp\Client as HttpClient;
 
 class Client
 {
@@ -74,12 +75,12 @@ class Client
      * @param string $endpointUrl
      * @param \GuzzleHttp\Client $client
      */
-    public function __construct($token, $endpointUrl, \GuzzleHttp\Client $client = null)
+    public function __construct(string $token, string $endpointUrl, HttpClient $client = null)
     {
         $this->token = $token;
         $this->endpointUrl = $endpointUrl;
         if ($client === null) {
-            $client = new \GuzzleHttp\Client();
+            $client = new HttpClient();
         }
 
         $this->client = $client;
