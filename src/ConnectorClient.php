@@ -7,28 +7,23 @@
 namespace Jtl\Connector\Client;
 
 use JMS\Serializer\Serializer;
-use Jtl\Connector\Client\Features\FeaturesCollection;
+use Jtl\Connector\Core\Definition\RpcMethod;
 use Jtl\Connector\Core\Model\Ack;
 use Jtl\Connector\Core\Model\ConnectorIdentification;
+use Jtl\Connector\Core\Model\Features;
 use Jtl\Connector\Core\Serializer\SerializerBuilder;
 use Jtl\Connector\Core\Model\AbstractDataModel;
 use GuzzleHttp\Client as HttpClient;
+use Jtl\Connector\Core\Utilities\Str;
 
-class Client
+class ConnectorClient
 {
     const JTL_RPC_VERSION = "2.0";
     const DEFAULT_PULL_LIMIT = 100;
 
-    const METHOD_ACK = 'core.connector.ack';
-    const METHOD_AUTH = 'core.connector.auth';
-    const METHOD_FEATURES = 'core.connector.features';
-    const METHOD_IDENTIFY = 'connector.identify';
-    const METHOD_FINISH = 'connector.finish';
-    const METHOD_CLEAR = 'core.linker.clear';
-
-    const DATA_FORMAT_JSON = 'json';
-    const DATA_FORMAT_ARRAY = 'array';
-    const DATA_FORMAT_OBJECT = 'object';
+    const RESPONSE_FORMAT_JSON = 'json';
+    const RESPONSE_FORMAT_ARRAY = 'array';
+    const RESPONSE_FORMAT_OBJECT = 'object';
 
     /**
      * The Connector endpoint url
@@ -40,7 +35,7 @@ class Client
     /**
      * @var HttpClient
      */
-    protected $client;
+    protected $httpClient;
 
     /**
      * @var string
@@ -60,42 +55,42 @@ class Client
     /**
      * @var string
      */
-    protected $responseFormat = self::DATA_FORMAT_OBJECT;
+    protected $responseFormat = self::RESPONSE_FORMAT_OBJECT;
 
     /**
      * @var string[]
      */
     protected static $responseFormats = [
-      self::DATA_FORMAT_ARRAY, self::DATA_FORMAT_JSON, self::DATA_FORMAT_OBJECT
+        self::RESPONSE_FORMAT_ARRAY, self::RESPONSE_FORMAT_JSON, self::RESPONSE_FORMAT_OBJECT
     ];
 
     /**
      * Client constructor.
      * @param string $token
      * @param string $endpointUrl
-     * @param HttpClient $client
+     * @param HttpClient $httpClient
      */
-    public function __construct(string $token, string $endpointUrl, HttpClient $client = null)
+    public function __construct(string $token, string $endpointUrl, HttpClient $httpClient = null)
     {
         $this->token = $token;
         $this->endpointUrl = $endpointUrl;
-        if ($client === null) {
-            $client = new HttpClient();
+        if ($httpClient === null) {
+            $httpClient = new HttpClient();
         }
 
-        $this->client = $client;
-        $this->serializer = SerializerBuilder::create();
+        $this->httpClient = $httpClient;
+        $this->serializer = SerializerBuilder::getInstance()->build();
     }
 
     /**
      * @return void
      * @throws ResponseException
      */
-    public function authenticate()
+    public function authenticate(): void
     {
         $this->sessionId = null;
         $params = ['token' => $this->token];
-        $result = $this->request(self::METHOD_AUTH, $params, true);
+        $result = $this->request(RpcMethod::AUTH, $params, true);
 
         if (is_array($result)
             && isset($result['sessionId'])
@@ -114,7 +109,7 @@ class Client
         }
 
         try {
-            $this->request(self::METHOD_IDENTIFY, [], true);
+            $this->request(RpcMethod::IDENTIFY, [], true);
         } catch (ResponseException $ex) {
             return false;
         }
@@ -126,9 +121,9 @@ class Client
      * @return FeaturesCollection
      * @throws ResponseException
      */
-    public function features(): FeaturesCollection
+    public function features(): Features
     {
-        $response = $this->request(self::METHOD_FEATURES);
+        $response = $this->request(RpcMethod::FEATURES);
 
         $entities = [];
         if (isset($response['entities']) && is_array($response['entities'])) {
@@ -140,7 +135,7 @@ class Client
             $flags = $response['flags'];
         }
 
-        return FeaturesCollection::create($entities, $flags);
+        return Features::create($entities, $flags);
     }
 
     /**
@@ -149,7 +144,7 @@ class Client
      */
     public function clear(): bool
     {
-        return $this->request(self::METHOD_CLEAR);
+        return $this->request(RpcMethod::CLEAR);
     }
 
     /**
@@ -158,9 +153,8 @@ class Client
      */
     public function identify(): ConnectorIdentification
     {
-        $json = \json_encode($this->request(self::METHOD_IDENTIFY));
-        $ns = ConnectorIdentification::class;
-        return $this->serializer->deserialize($json, $ns, 'json');
+        $data = $this->request(RpcMethod::IDENTIFY);
+        return $this->serializer->fromArray($data, ConnectorIdentification::class, 'json');
     }
 
     /**
@@ -169,7 +163,7 @@ class Client
      */
     public function finish()
     {
-        return $this->request(self::METHOD_FINISH);
+        return $this->request(RpcMethod::FINISH);
     }
 
     /**
@@ -192,8 +186,8 @@ class Client
      */
     public function push(string $controllerName, array $entities)
     {
-        $serialized = $this->serializer->serialize($entities, 'json');
-        return $this->requestAndPrepare($controllerName, 'push', \json_decode($serialized, true));
+        $data = $this->serializer->toArray($entities);
+        return $this->requestAndPrepare($controllerName, 'push', $data);
     }
 
     /**
@@ -215,8 +209,8 @@ class Client
      */
     public function delete(string $controllerName, array $entities)
     {
-        $serialized = $this->serializer->serialize($entities, 'json');
-        return $this->requestAndPrepare($controllerName, 'delete', \json_decode($serialized, true));
+        $data = $this->serializer->toArray($entities);
+        return $this->requestAndPrepare($controllerName, 'delete', $data);
     }
 
     /**
@@ -226,8 +220,8 @@ class Client
      */
     public function ack(Ack $ack)
     {
-        $serialized = $this->serializer->serialize($ack, 'json');
-        return $this->request(self::METHOD_ACK, \json_decode($serialized, true));
+        $data = $this->serializer->toArray($ack);
+        return $this->request(RpcMethod::ACK, $data);
     }
 
     /**
@@ -250,9 +244,9 @@ class Client
 
     /**
      * @param string $token
-     * @return Client
+     * @return ConnectorClient
      */
-    public function setToken(string $token): Client
+    public function setToken(string $token): ConnectorClient
     {
         $this->token = $token;
         $this->sessionId = null;
@@ -269,11 +263,11 @@ class Client
 
     /**
      * @param string $format
-     * @return Client
+     * @return ConnectorClient
      */
-    public function setResponseFormat(string $format): Client
+    public function setResponseFormat(string $format): ConnectorClient
     {
-        if(!self::isValidResponseFormat($format)) {
+        if (!self::isValidResponseFormat($format)) {
             throw new RuntimeException(sprintf('%s is not a valid response format!', $format));
         }
 
@@ -292,16 +286,16 @@ class Client
         $method = $controllerName . '.' . $action;
         $entitiesData = $this->request($method, $params);
         switch ($this->responseFormat) {
-            case self::DATA_FORMAT_OBJECT:
-                $className = 'Jtl\\Connector\\Core\\Model\\' . $this->underscoreToCamelCase($controllerName);
+            case self::RESPONSE_FORMAT_OBJECT:
+                $className = 'Jtl\\Connector\\Core\\Model\\' . Str::toPascalCase($controllerName);
                 if (!is_subclass_of($className, AbstractDataModel::class)) {
                     throw new RuntimeException($className . ' does not inherit from ' . AbstractDataModel::class . '!');
                 }
 
-                $ns = 'ArrayCollection<' . $className . '>';
-                return $this->serializer->deserialize(\json_encode($entitiesData), $ns, 'json');
+                $type = 'ArrayCollection<' . $className . '>';
+                return $this->serializer->fromArray($entitiesData, $type);
                 break;
-            case self::DATA_FORMAT_JSON:
+            case self::RESPONSE_FORMAT_JSON:
                 return \json_encode($entitiesData);
                 break;
         }
@@ -315,7 +309,7 @@ class Client
      * @return mixed[]
      * @throws ResponseException
      */
-    protected function request(string $method, array $params = [],bool $authRequest = false)
+    protected function request(string $method, array $params = [], bool $authRequest = false)
     {
         if (!$authRequest && $this->sessionId === null) {
             $this->authenticate();
@@ -326,7 +320,7 @@ class Client
         if (version_compare(HttpClient::VERSION, '6.0.0', '<')) {
             $requestBodyIndex = 'body';
         }
-        $result = $this->client->post($this->endpointUrl, [$requestBodyIndex => $this->createRequestParams($requestId, $method, $params)]);
+        $result = $this->httpClient->post($this->endpointUrl, [$requestBodyIndex => $this->createRequestParams($requestId, $method, $params)]);
         $content = $result->getBody()->getContents();
 
         $response = \json_decode($content, true);
@@ -374,19 +368,6 @@ class Client
         }
 
         return $requestParams;
-    }
-
-    /**
-     * @param string $string
-     * @return string
-     */
-    protected function underscoreToCamelCase(string $string): string
-    {
-        $camelCase = '';
-        foreach (explode('_', $string) as $part) {
-            $camelCase .= ucfirst($part);
-        }
-        return $camelCase;
     }
 
     /**
