@@ -179,8 +179,8 @@ class FeaturesCollection
         }
 
         $featureFlags = [];
-        foreach ($flags as $name => $value) {
-            $featureFlags[] = new FeatureFlag($name, $value);
+        foreach ($flags as $flag) {
+            $featureFlags[] = new FeatureFlag($flag['name'], (bool) $flag['active']);
         }
         return new static($featureEntities, $featureFlags);
     }

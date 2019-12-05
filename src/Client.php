@@ -8,10 +8,10 @@ namespace Jtl\Connector\Client;
 
 use JMS\Serializer\Serializer;
 use Jtl\Connector\Client\Features\FeaturesCollection;
-use jtl\Connector\Model\Ack;
-use jtl\Connector\Model\ConnectorIdentification;
-use jtl\Connector\Model\DataModel;
-use jtl\Connector\Serializer\JMS\SerializerBuilder;
+use Jtl\Connector\Core\Model\Ack;
+use Jtl\Connector\Core\Model\ConnectorIdentification;
+use Jtl\Connector\Core\Serializer\SerializerBuilder;
+use Jtl\Connector\Core\Model\AbstractDataModel;
 use GuzzleHttp\Client as HttpClient;
 
 class Client
@@ -38,7 +38,7 @@ class Client
     protected $endpointUrl;
 
     /**
-     * @var \GuzzleHttp\Client
+     * @var HttpClient
      */
     protected $client;
 
@@ -73,7 +73,7 @@ class Client
      * Client constructor.
      * @param string $token
      * @param string $endpointUrl
-     * @param \GuzzleHttp\Client $client
+     * @param HttpClient $client
      */
     public function __construct(string $token, string $endpointUrl, HttpClient $client = null)
     {
@@ -175,7 +175,7 @@ class Client
     /**
      * @param string $controllerName
      * @param integer $limit
-     * @return DataModel[]|mixed[]|string
+     * @return AbstractDataModel[]|mixed[]|string
      * @throws \RuntimeException
      * @throws ResponseException
      */
@@ -193,6 +193,17 @@ class Client
     public function push(string $controllerName, array $entities)
     {
         $serialized = $this->serializer->serialize($entities, 'json');
+        return $this->requestAndPrepare($controllerName, 'push', \json_decode($serialized, true));
+    }
+
+    /**
+     * @param string $controllerName
+     * @param string $payload
+     * @return mixed[]|object|object[]|string
+     */
+    public function rawPush(string $controllerName, string $payload)
+    {
+        $serialized = $payload;
         return $this->requestAndPrepare($controllerName, 'push', \json_decode($serialized, true));
     }
 
@@ -282,9 +293,9 @@ class Client
         $entitiesData = $this->request($method, $params);
         switch ($this->responseFormat) {
             case self::DATA_FORMAT_OBJECT:
-                $className = 'jtl\\Connector\\Model\\' . $this->underscoreToCamelCase($controllerName);
-                if (!is_subclass_of($className, \jtl\Connector\Model\DataModel::class)) {
-                    throw new RuntimeException($className . ' does not inherit from ' . \jtl\Connector\Model\DataModel::class . '!');
+                $className = 'Jtl\\Connector\\Core\\Model\\' . $this->underscoreToCamelCase($controllerName);
+                if (!is_subclass_of($className, AbstractDataModel::class)) {
+                    throw new RuntimeException($className . ' does not inherit from ' . AbstractDataModel::class . '!');
                 }
 
                 $ns = 'ArrayCollection<' . $className . '>';
@@ -304,7 +315,7 @@ class Client
      * @return mixed[]
      * @throws ResponseException
      */
-    protected function request(string $method, array $params = [],bool $authRequest = false): array
+    protected function request(string $method, array $params = [],bool $authRequest = false)
     {
         if (!$authRequest && $this->sessionId === null) {
             $this->authenticate();
@@ -312,11 +323,12 @@ class Client
 
         $requestId = uniqid();
         $requestBodyIndex = 'form_params';
-        if (version_compare(\GuzzleHttp\Client::VERSION, '6.0.0', '<')) {
+        if (version_compare(HttpClient::VERSION, '6.0.0', '<')) {
             $requestBodyIndex = 'body';
         }
         $result = $this->client->post($this->endpointUrl, [$requestBodyIndex => $this->createRequestParams($requestId, $method, $params)]);
         $content = $result->getBody()->getContents();
+
         $response = \json_decode($content, true);
 
         if (isset($response['error']) && is_array($response['error']) && !empty($response['error'])) {
