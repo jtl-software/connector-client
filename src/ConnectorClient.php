@@ -154,7 +154,7 @@ class ConnectorClient
     public function identify(): ConnectorIdentification
     {
         $data = $this->request(RpcMethod::IDENTIFY);
-        return $this->serializer->fromArray($data, ConnectorIdentification::class, 'json');
+        return $this->serializer->fromArray($data, ConnectorIdentification::class);
     }
 
     /**
@@ -267,8 +267,8 @@ class ConnectorClient
      */
     public function setResponseFormat(string $format): ConnectorClient
     {
-        if (!self::isValidResponseFormat($format)) {
-            throw new RuntimeException(sprintf('%s is not a valid response format!', $format));
+        if (!self::isResponseFormat($format)) {
+            throw new RuntimeException(sprintf('%s is not a response format!', $format));
         }
 
         $this->responseFormat = $format;
@@ -374,7 +374,7 @@ class ConnectorClient
      * @param string $format
      * @return bool
      */
-    public static function isValidResponseFormat(string $format): bool
+    public static function isResponseFormat(string $format): bool
     {
         return in_array($format, self::$responseFormats);
     }
