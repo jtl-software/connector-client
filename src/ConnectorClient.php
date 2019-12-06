@@ -79,7 +79,6 @@ class ConnectorClient
         }
 
         $this->httpClient = $httpClient;
-        $this->serializer = SerializerBuilder::getInstance()->build();
     }
 
     /**
