@@ -291,7 +291,7 @@ class ConnectorClient
                     throw new RuntimeException($className . ' does not inherit from ' . AbstractDataModel::class . '!');
                 }
 
-                $type = 'ArrayCollection<' . $className . '>';
+                $type = 'array<' . $className . '>';
                 return $this->getSerializer()->fromArray($entitiesData, $type);
                 break;
             case self::RESPONSE_FORMAT_JSON:
