@@ -154,7 +154,7 @@ class ConnectorClient
     public function identify(): ConnectorIdentification
     {
         $data = $this->request(RpcMethod::IDENTIFY);
-        return $this->serializer->fromArray($data, ConnectorIdentification::class);
+        return $this->getSerializer()->fromArray($data, ConnectorIdentification::class);
     }
 
     /**
@@ -186,7 +186,7 @@ class ConnectorClient
      */
     public function push(string $controllerName, array $entities)
     {
-        $data = $this->serializer->toArray($entities);
+        $data = $this->getSerializer()->toArray($entities);
         return $this->requestAndPrepare($controllerName, 'push', $data);
     }
 
@@ -209,7 +209,7 @@ class ConnectorClient
      */
     public function delete(string $controllerName, array $entities)
     {
-        $data = $this->serializer->toArray($entities);
+        $data = $this->getSerializer()->toArray($entities);
         return $this->requestAndPrepare($controllerName, 'delete', $data);
     }
 
@@ -220,7 +220,7 @@ class ConnectorClient
      */
     public function ack(Ack $ack)
     {
-        $data = $this->serializer->toArray($ack);
+        $data = $this->getSerializer()->toArray($ack);
         return $this->request(RpcMethod::ACK, $data);
     }
 
@@ -293,7 +293,7 @@ class ConnectorClient
                 }
 
                 $type = 'ArrayCollection<' . $className . '>';
-                return $this->serializer->fromArray($entitiesData, $type);
+                return $this->getSerializer()->fromArray($entitiesData, $type);
                 break;
             case self::RESPONSE_FORMAT_JSON:
                 return \json_encode($entitiesData);
@@ -368,6 +368,18 @@ class ConnectorClient
         }
 
         return $requestParams;
+    }
+
+    /**
+     * @return Serializer
+     */
+    protected function getSerializer(): Serializer
+    {
+        if (is_null($this->serializer)) {
+            \Doctrine\Common\Annotations\AnnotationRegistry::registerLoader('class_exists');
+            $this->serializer = SerializerBuilder::getInstance()->build();
+        }
+        return $this->serializer;
     }
 
     /**
