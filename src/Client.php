@@ -299,12 +299,11 @@ class Client
 
     /**
      * @param string $method
-     * @param mixed[] $params
-     * @param boolean $authRequest
-     * @return mixed[]
-     * @throws ResponseException
+     * @param array $params
+     * @param bool $authRequest
+     * @return mixed
      */
-    protected function request(string $method, array $params = [],bool $authRequest = false): array
+    protected function request(string $method, array $params = [],bool $authRequest = false)
     {
         if (!$authRequest && $this->sessionId === null) {
             $this->authenticate();
