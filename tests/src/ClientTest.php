@@ -8,7 +8,7 @@
 
 namespace jtl\Connector\Client;
 
-use Jtl\Connector\Client\Client;
+use Jtl\Connector\Client\ConnectorClient;
 use PHPUnit\Framework\TestCase;
 
 class ClientTest extends TestCase
