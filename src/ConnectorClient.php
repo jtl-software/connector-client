@@ -68,7 +68,7 @@ class ConnectorClient
      * Client constructor.
      * @param string $token
      * @param string $endpointUrl
-     * @param HttpClient $httpClient
+     * @param HttpClient|null $httpClient
      */
     public function __construct(string $token, string $endpointUrl, HttpClient $httpClient = null)
     {
@@ -376,7 +376,7 @@ class ConnectorClient
     {
         if (is_null($this->serializer)) {
             \Doctrine\Common\Annotations\AnnotationRegistry::registerLoader('class_exists');
-            $this->serializer = SerializerBuilder::getInstance()->build();
+            $this->serializer = SerializerBuilder::create()->build();
         }
         return $this->serializer;
     }
