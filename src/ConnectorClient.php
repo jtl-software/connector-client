@@ -10,6 +10,7 @@ use Doctrine\Common\Annotations\AnnotationRegistry;
 use Jawira\CaseConverter\CaseConverterException;
 use JMS\Serializer\Serializer;
 use Jtl\Connector\Core\Definition\RpcMethod;
+use Jtl\Connector\Core\Exception\DefinitionException;
 use Jtl\Connector\Core\Model\AbstractImage;
 use Jtl\Connector\Core\Model\Ack;
 use Jtl\Connector\Core\Model\ConnectorIdentification;
@@ -333,12 +334,7 @@ class ConnectorClient
         $options = [];
         $requestId = uniqid();
         if (is_null($zipFile)) {
-            $requestDataIndex = 'form_params';
-            if (version_compare(HttpClient::VERSION, '6.0.0', '<')) {
-                $requestDataIndex = 'body';
-            }
-
-            $options[$requestDataIndex] = $this->createRequestParams($requestId, $method, $params);
+            $options['form_params'] = $this->createRequestParams($requestId, $method, $params);
         } else {
             $options['multipart'] = [
                 [
@@ -418,11 +414,11 @@ class ConnectorClient
     }
 
 
-
     /**
      * @param AbstractImage $image
      * @param AbstractImage ...$moreImages
      * @return string
+     * @throws DefinitionException
      */
     protected function createZipFile(AbstractImage $image, AbstractImage ...$moreImages): string
     {

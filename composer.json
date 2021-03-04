@@ -10,7 +10,8 @@
     }
   ],
   "require": {
-    "guzzlehttp/guzzle": "^5.3|^6.3",
+    "ext-zip": "*",
+    "guzzlehttp/guzzle": "^6.3|^7.0",
     "jtl/connector": "^4.0"
   },
   "autoload": {
