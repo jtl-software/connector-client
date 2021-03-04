@@ -6,8 +6,11 @@
 
 namespace Jtl\Connector\Client;
 
+use Doctrine\Common\Annotations\AnnotationRegistry;
+use Jawira\CaseConverter\CaseConverterException;
 use JMS\Serializer\Serializer;
 use Jtl\Connector\Core\Definition\RpcMethod;
+use Jtl\Connector\Core\Model\AbstractImage;
 use Jtl\Connector\Core\Model\Ack;
 use Jtl\Connector\Core\Model\ConnectorIdentification;
 use Jtl\Connector\Core\Model\Features;
@@ -117,7 +120,7 @@ class ConnectorClient
     }
 
     /**
-     * @return FeaturesCollection
+     * @return Features
      * @throws ResponseException
      */
     public function features(): Features
@@ -170,7 +173,7 @@ class ConnectorClient
      * @param integer $limit
      * @return AbstractDataModel[]|mixed[]|string
      * @throws \RuntimeException
-     * @throws ResponseException
+     * @throws ResponseException|CaseConverterException
      */
     public function pull(string $controllerName, int $limit = self::DEFAULT_PULL_LIMIT)
     {
@@ -181,18 +184,24 @@ class ConnectorClient
      * @param string $controllerName
      * @param mixed[] $entities
      * @return mixed[]
-     * @throws ResponseException
+     * @throws ResponseException|CaseConverterException
      */
     public function push(string $controllerName, array $entities)
     {
+        $zipFile = null;
+        if ($controllerName === 'image') {
+            $zipFile = $this->createZipFile(...$entities);
+        }
+
         $data = $this->getSerializer()->toArray($entities);
-        return $this->requestAndPrepare($controllerName, 'push', $data);
+        return $this->requestAndPrepare($controllerName, 'push', $data, $zipFile);
     }
 
     /**
      * @param string $controllerName
      * @param string $payload
      * @return mixed[]|object|object[]|string
+     * @throws CaseConverterException
      */
     public function rawPush(string $controllerName, string $payload)
     {
@@ -204,7 +213,7 @@ class ConnectorClient
      * @param string $controllerName
      * @param mixed[] $entities
      * @return mixed[]
-     * @throws ResponseException
+     * @throws ResponseException|CaseConverterException
      */
     public function delete(string $controllerName, array $entities)
     {
@@ -267,7 +276,7 @@ class ConnectorClient
     public function setResponseFormat(string $format): ConnectorClient
     {
         if (!self::isResponseFormat($format)) {
-            throw new RuntimeException(sprintf('%s is not a response format!', $format));
+            throw new RuntimeException(sprintf('%s is not a response format', $format));
         }
 
         $this->responseFormat = $format;
@@ -278,20 +287,27 @@ class ConnectorClient
      * @param string $controllerName
      * @param string $action
      * @param array $params
-     * @return string|mixed[]|object[]|object
+     * @param string|null $zipFile
+     * @return false|mixed|mixed[]|string
+     * @throws CaseConverterException
      */
-    protected function requestAndPrepare(string $controllerName, string $action, array $params = [])
+    protected function requestAndPrepare(string $controllerName, string $action, array $params = [], string $zipFile = null)
     {
         $method = $controllerName . '.' . $action;
-        $entitiesData = $this->request($method, $params);
+        $entitiesData = $this->request($method, $params, false, $zipFile);
         switch ($this->responseFormat) {
             case self::RESPONSE_FORMAT_OBJECT:
-                $className = 'Jtl\\Connector\\Core\\Model\\' . Str::toPascalCase($controllerName);
-                if (!is_subclass_of($className, AbstractDataModel::class)) {
-                    throw new RuntimeException($className . ' does not inherit from ' . AbstractDataModel::class . '!');
+                $modelName = Str::toPascalCase($controllerName);
+                if($controllerName === 'image') {
+                    $modelName = 'AbstractImage';
                 }
 
-                $type = 'array<' . $className . '>';
+                $className = sprintf('Jtl\\Connector\\Core\\Model\\%s', $modelName);
+                if (!is_subclass_of($className, AbstractDataModel::class)) {
+                    throw new RuntimeException(sprintf('%s does not inherit from %s', $className, AbstractDataModel::class));
+                }
+
+                $type = sprintf('array<%s>', $className);
                 return $this->getSerializer()->fromArray($entitiesData, $type);
                 break;
             case self::RESPONSE_FORMAT_JSON:
@@ -303,27 +319,47 @@ class ConnectorClient
 
     /**
      * @param string $method
-     * @param mixed[] $params
-     * @param boolean $authRequest
-     * @return mixed[]
-     * @throws ResponseException
+     * @param array $params
+     * @param bool $authRequest
+     * @param string|null $zipFile
+     * @return mixed
      */
-    protected function request(string $method, array $params = [], bool $authRequest = false)
+    protected function request(string $method, array $params = [], bool $authRequest = false, string $zipFile = null)
     {
         if (!$authRequest && $this->sessionId === null) {
             $this->authenticate();
         }
 
+        $options = [];
         $requestId = uniqid();
-        $requestBodyIndex = 'form_params';
-        if (version_compare(HttpClient::VERSION, '6.0.0', '<')) {
-            $requestBodyIndex = 'body';
+        if (is_null($zipFile)) {
+            $requestDataIndex = 'form_params';
+            if (version_compare(HttpClient::VERSION, '6.0.0', '<')) {
+                $requestDataIndex = 'body';
+            }
+
+            $options[$requestDataIndex] = $this->createRequestParams($requestId, $method, $params);
+        } else {
+            $options['multipart'] = [
+                [
+                    'name' => 'jtlauth',
+                    'contents' => $this->sessionId
+                ],
+                [
+                    'name' => 'jtlrpc',
+                    'contents' => json_encode($this->createJtlRpcRequestParam($requestId, $method, $params))
+                ],
+                [
+                    'name' => 'file',
+                    'contents' => fopen($zipFile, 'r'),
+                    'filename' => 'images.zip'
+                ]
+            ];
         }
-        $result = $this->httpClient->post($this->endpointUrl, [$requestBodyIndex => $this->createRequestParams($requestId, $method, $params)]);
+
+        $result = $this->httpClient->post($this->endpointUrl, $options);
         $content = $result->getBody()->getContents();
-
         $response = \json_decode($content, true);
-
         if (isset($response['error']) && is_array($response['error']) && !empty($response['error'])) {
             $error = $response['error'];
             $message = isset($error['message']) ? $error['message'] : 'Unknown Error while fetching connector response';
@@ -332,6 +368,7 @@ class ConnectorClient
                 $this->authenticate();
                 return $this->request($method, $params);
             }
+
             throw ResponseException::responseError($message, $code);
         }
 
@@ -350,18 +387,7 @@ class ConnectorClient
      */
     protected function createRequestParams(string $requestId, string $method, array $params = []): array
     {
-        $rpcData = [
-            'method' => $method,
-        ];
-
-        if (count($params) > 0) {
-            $rpcData['params'] = $params;
-        }
-
-        $rpcData['jtlrpc'] = self::JTL_RPC_VERSION;
-        $rpcData['id'] = $requestId;
-
-        $requestParams = ['jtlrpc' => \json_encode($rpcData)];
+        $requestParams = ['jtlrpc' => \json_encode($this->createJtlRpcRequestParam($requestId, $method, $params))];
         if (!is_null($this->sessionId) && strlen($this->sessionId) > 0) {
             $requestParams['jtlauth'] = $this->sessionId;
         }
@@ -370,14 +396,68 @@ class ConnectorClient
     }
 
     /**
+     * @param string $requestId
+     * @param string $method
+     * @param array $params
+     * @return string[]
+     */
+    protected function createJtlRpcRequestParam(string $requestId, string $method, array $params): array
+    {
+        $jtlRpcParam = [
+            'method' => $method,
+        ];
+
+        if (count($params) > 0) {
+            $jtlRpcParam['params'] = $params;
+        }
+
+        $jtlRpcParam['jtlrpc'] = self::JTL_RPC_VERSION;
+        $jtlRpcParam['id'] = $requestId;
+
+        return $jtlRpcParam;
+    }
+
+
+
+    /**
+     * @param AbstractImage $image
+     * @param AbstractImage ...$moreImages
+     * @return string
+     */
+    protected function createZipFile(AbstractImage $image, AbstractImage ...$moreImages): string
+    {
+        $tempFile = tempnam(sys_get_temp_dir(), 'images-');
+        $zip = new \ZipArchive();
+        if ($zip->open($tempFile) !== true) {
+            unlink($tempFile);
+            throw new RuntimeException('Could not open temporary zip file');
+        }
+
+        /** @var AbstractImage $image */
+        foreach (array_merge([$image], $moreImages) as $image) {
+            $imagePath = $image->getFilename();
+            if (file_exists($imagePath)) {
+                $startPos = strrpos($imagePath, '/') + 1;
+                $fileName = sprintf('%d_%s_%s', $image->getId()->getHost(), $image->getRelationType(), substr($image->getFilename(), $startPos));
+                $zip->addFile($imagePath, $fileName);
+                $image->setFilename($fileName);
+            }
+        }
+        $zip->close();
+
+        return $tempFile;
+    }
+
+    /**
      * @return Serializer
      */
     protected function getSerializer(): Serializer
     {
         if (is_null($this->serializer)) {
-            \Doctrine\Common\Annotations\AnnotationRegistry::registerLoader('class_exists');
+            AnnotationRegistry::registerLoader('class_exists');
             $this->serializer = SerializerBuilder::create()->build();
         }
+
         return $this->serializer;
     }
 
