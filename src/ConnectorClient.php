@@ -7,6 +7,7 @@
 namespace Jtl\Connector\Client;
 
 use Doctrine\Common\Annotations\AnnotationRegistry;
+use GuzzleHttp\Exception\RequestException;
 use Jawira\CaseConverter\CaseConverterException;
 use JMS\Serializer\Serializer;
 use Jtl\Connector\Core\Definition\RpcMethod;
@@ -299,7 +300,7 @@ class ConnectorClient
         switch ($this->responseFormat) {
             case self::RESPONSE_FORMAT_OBJECT:
                 $modelName = Str::toPascalCase($controllerName);
-                if($controllerName === 'image') {
+                if ($controllerName === 'image') {
                     $modelName = 'AbstractImage';
                 }
 
@@ -324,6 +325,7 @@ class ConnectorClient
      * @param bool $authRequest
      * @param string|null $zipFile
      * @return mixed
+     * @throws \GuzzleHttp\Exception\GuzzleException
      */
     protected function request(string $method, array $params = [], bool $authRequest = false, string $zipFile = null)
     {
@@ -353,8 +355,17 @@ class ConnectorClient
             ];
         }
 
-        $result = $this->httpClient->post($this->endpointUrl, $options);
-        $content = $result->getBody()->getContents();
+        try {
+            $response = $this->httpClient->post($this->endpointUrl, $options);
+        } catch (RequestException $ex) {
+            $response = $ex->getResponse();
+        } finally {
+            if (!is_null($zipFile) && file_exists($zipFile)) {
+                unlink($zipFile);
+            }
+        }
+
+        $content = $response->getBody()->getContents();
         $response = \json_decode($content, true);
         if (isset($response['error']) && is_array($response['error']) && !empty($response['error'])) {
             $error = $response['error'];
