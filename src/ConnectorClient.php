@@ -17,7 +17,7 @@ use Jtl\Connector\Core\Model\Ack;
 use Jtl\Connector\Core\Model\ConnectorIdentification;
 use Jtl\Connector\Core\Model\Features;
 use Jtl\Connector\Core\Serializer\SerializerBuilder;
-use Jtl\Connector\Core\Model\AbstractDataModel;
+use Jtl\Connector\Core\Model\AbstractModel;
 use GuzzleHttp\Client as HttpClient;
 use Jtl\Connector\Core\Utilities\Str;
 
@@ -173,7 +173,7 @@ class ConnectorClient
     /**
      * @param string $controllerName
      * @param integer $limit
-     * @return AbstractDataModel[]|mixed[]|string
+     * @return AbstractModel[]|mixed[]|string
      * @throws \RuntimeException
      * @throws ResponseException|CaseConverterException
      */
@@ -305,8 +305,8 @@ class ConnectorClient
                 }
 
                 $className = sprintf('Jtl\\Connector\\Core\\Model\\%s', $modelName);
-                if (!is_subclass_of($className, AbstractDataModel::class)) {
-                    throw new RuntimeException(sprintf('%s does not inherit from %s', $className, AbstractDataModel::class));
+                if (!is_subclass_of($className, AbstractModel::class)) {
+                    throw new RuntimeException(sprintf('%s does not inherit from %s', $className, AbstractModel::class));
                 }
 
                 $type = sprintf('array<%s>', $className);
@@ -433,9 +433,9 @@ class ConnectorClient
      */
     protected function createZipFile(AbstractImage $image, AbstractImage ...$moreImages): string
     {
-        $tempFile = tempnam(sys_get_temp_dir(), 'images-');
+        $tempFile = sys_get_temp_dir() . '/images-' . uniqid() . '.zip';
         $zip = new \ZipArchive();
-        if ($zip->open($tempFile) !== true) {
+        if ($zip->open($tempFile,\ZipArchive::CREATE|\ZipArchive::OVERWRITE) !== true) {
             unlink($tempFile);
             throw new RuntimeException('Could not open temporary zip file');
         }

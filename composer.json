@@ -12,7 +12,8 @@
   "require": {
     "ext-zip": "*",
     "guzzlehttp/guzzle": "^6.3|^7.0",
-    "jtl/connector": "^4.0"
+    "jtl/connector": "^5.0",
+    "ext-json": "*"
   },
   "autoload": {
     "psr-4": {
