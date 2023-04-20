@@ -38,6 +38,11 @@ class ConnectorClient
     protected $endpointUrl;
 
     /**
+     * @var bool
+     */
+    protected $fullResponse;
+
+    /**
      * @var HttpClient
      */
     protected $httpClient;
@@ -367,6 +372,9 @@ class ConnectorClient
 
         $content = $response->getBody()->getContents();
         $response = \json_decode($content, true);
+        if (!$authRequest && $this->fullResponse) {
+            return $response;
+        }
         if (isset($response['error']) && is_array($response['error']) && !empty($response['error'])) {
             $error = $response['error'];
             $message = isset($error['message']) ? $error['message'] : 'Unknown Error while fetching connector response';
