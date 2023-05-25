@@ -41,7 +41,7 @@ class ConnectorClient
     /**
      * @var bool
      */
-    protected $fullResponse;
+    protected $fullResponse = false;
 
     /**
      * @var HttpClient
@@ -481,6 +481,15 @@ class ConnectorClient
         }
 
         return $this->serializer;
+    }
+
+    /**
+     * @param bool $fullResponse
+     * @return void
+     */
+    public function setFullResponse(bool $fullResponse): void
+    {
+        $this->fullResponse = $fullResponse;
     }
 
     /**
