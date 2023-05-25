@@ -16,6 +16,7 @@ use Jtl\Connector\Core\Model\AbstractImage;
 use Jtl\Connector\Core\Model\Ack;
 use Jtl\Connector\Core\Model\ConnectorIdentification;
 use Jtl\Connector\Core\Model\Features;
+use Jtl\Connector\Core\Model\Identities;
 use Jtl\Connector\Core\Serializer\SerializerBuilder;
 use Jtl\Connector\Core\Model\AbstractModel;
 use GuzzleHttp\Client as HttpClient;
@@ -36,6 +37,11 @@ class ConnectorClient
      * @var string
      */
     protected $endpointUrl;
+
+    /**
+     * @var bool
+     */
+    protected $fullResponse;
 
     /**
      * @var HttpClient
@@ -149,6 +155,12 @@ class ConnectorClient
     public function clear(): bool
     {
         return $this->request(RpcMethod::CLEAR);
+    }
+
+    public function clearFromJson(Identities $identities): array
+    {
+        $data = $this->getSerializer()->toArray($identities);
+        return $this->request(RpcMethod::CLEAR, $data);
     }
 
     /**
@@ -367,6 +379,9 @@ class ConnectorClient
 
         $content = $response->getBody()->getContents();
         $response = \json_decode($content, true);
+        if (!$authRequest && $this->fullResponse) {
+            return $response;
+        }
         if (isset($response['error']) && is_array($response['error']) && !empty($response['error'])) {
             $error = $response['error'];
             $message = isset($error['message']) ? $error['message'] : 'Unknown Error while fetching connector response';
