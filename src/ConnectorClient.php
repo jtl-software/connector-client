@@ -7,6 +7,7 @@
 namespace Jtl\Connector\Client;
 
 use Doctrine\Common\Annotations\AnnotationRegistry;
+use GuzzleHttp\Exception\GuzzleException;
 use GuzzleHttp\Exception\RequestException;
 use Jawira\CaseConverter\CaseConverterException;
 use JMS\Serializer\Serializer;
@@ -157,9 +158,19 @@ class ConnectorClient
         return $this->request(RpcMethod::CLEAR);
     }
 
-    public function clearFromJson(Identities $identities): array
+    /**
+     * @param Identities $identities
+     * @param string $controller
+     * @return array
+     * @throws GuzzleException
+     */
+    public function clearFromJson(Identities $identities, string $controller): array
     {
-        $data = $this->getSerializer()->toArray($identities);
+        $data = ['identities' => [$controller => []]];
+        foreach ($identities->getIdentities() as $identity) {
+            $data['identities'][$controller][] = $identity->toArray();
+        }
+
         return $this->request(RpcMethod::CLEAR, $data);
     }
 
@@ -337,7 +348,7 @@ class ConnectorClient
      * @param bool $authRequest
      * @param string|null $zipFile
      * @return mixed
-     * @throws \GuzzleHttp\Exception\GuzzleException
+     * @throws GuzzleException
      */
     protected function request(string $method, array $params = [], bool $authRequest = false, string $zipFile = null)
     {
