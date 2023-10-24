@@ -17,7 +17,7 @@ use Jtl\Connector\Core\Model\AbstractImage;
 use Jtl\Connector\Core\Model\Ack;
 use Jtl\Connector\Core\Model\ConnectorIdentification;
 use Jtl\Connector\Core\Model\Features;
-use Jtl\Connector\Core\Model\Identities;
+use Jtl\Connector\Core\Model\Identity;
 use Jtl\Connector\Core\Serializer\SerializerBuilder;
 use Jtl\Connector\Core\Model\AbstractModel;
 use GuzzleHttp\Client as HttpClient;
@@ -159,15 +159,15 @@ class ConnectorClient
     }
 
     /**
-     * @param Identities $identities
      * @param string $controller
+     * @param Identity ...$identities
      * @return array
      * @throws GuzzleException
      */
-    public function clearFromJson(Identities $identities, string $controller): array
+    public function clearFromJson(string $controller, Identity ...$identities): array
     {
         $data = ['identities' => [$controller => []]];
-        foreach ($identities->getIdentities() as $identity) {
+        foreach ($identities as $identity) {
             $data['identities'][$controller][] = $identity->toArray();
         }
 
